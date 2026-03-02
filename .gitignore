@@ -1,0 +1,22 @@
+# Build output
+/target/
+
+# Maven
+/.mvn/
+
+# IDE files
+/.idea/
+*.iml
+/.classpath
+/.project
+/.settings/
+
+# VS Code local settings
+/.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

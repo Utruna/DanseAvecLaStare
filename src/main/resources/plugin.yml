@@ -1,0 +1,10 @@
+main: me.utruna.danse.DanseAvecLaStare
+version: 1.0.0-SNAPSHOT
+name: DanseAvecLaStare
+author: Utruna
+api-version: 1.21
+commands:
+	danse:
+		description: Lance ou arrête une danse
+		usage: /danse [twist|spin|bounce|list|stop]
+		aliases: [dance]

@@ -3,8 +3,8 @@ version: 1.0.0-SNAPSHOT
 name: DanseAvecLaStare
 author: Utruna
 api-version: 1.21
+softdepend: [Citizens]
 commands:
-	danse:
-		description: Lance ou arrête une danse
-		usage: /danse [twist|spin|bounce|list|stop]
-		aliases: [dance]
+  danse:
+    description: Lance ou arrête une danse
+    usage: /danse [twist|spin|disco|moonwalk|wave|list|stop]

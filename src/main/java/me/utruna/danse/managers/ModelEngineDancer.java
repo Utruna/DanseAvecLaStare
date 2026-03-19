@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.profile.PlayerProfile;
 
 import java.lang.reflect.Method;
+import java.util.Optional;
 import java.util.UUID;
 
 public class ModelEngineDancer implements Dancer {
@@ -18,31 +19,57 @@ public class ModelEngineDancer implements Dancer {
     private ModeledEntity modeledEntity;
     private ActiveModel activeModel;
 
-    // Must match the .bbmodel identifier loaded by ModelEngine
-    private final String modelId = "danseur";
+    // Must match the blueprint id loaded by ModelEngine
+    private final String modelId;
+
+    public ModelEngineDancer() {
+        this("danseur");
+    }
+
+    public ModelEngineDancer(String modelId) {
+        if (modelId == null || modelId.isBlank()) {
+            this.modelId = "danseur";
+        } else {
+            this.modelId = modelId.trim();
+        }
+    }
 
     @Override
     public void spawn(Location location, Player player) {
         this.owner = player;
 
-        // 1) Build a Dummy using the ME service available in this server version.
-        this.dummy = createDummyCompat();
+        // 1) Build a Dummy using constructors available in ModelEngine 4.0.9.
+        this.dummy = createDummyCompat(player);
         if (this.dummy == null) {
             throw new IllegalStateException("Impossible de creer un Dummy ModelEngine");
         }
         this.dummy.setLocation(location);
+        this.dummy.setVisible(true);
+        this.dummy.setRenderRadius(64);
 
         // 2) Create modeled entity and load model
         this.modeledEntity = ModelEngineAPI.createModeledEntity(dummy);
-        this.activeModel = ModelEngineAPI.createActiveModel(modelId);
-
-        if (activeModel != null) {
-            // 3) Player skin mapping: try known APIs in descending order.
-            applyPlayerSkinCompat(player);
-
-            // 4) Attach model regardless of method naming differences.
-            addModelCompat();
+        if (this.modeledEntity == null) {
+            throw new IllegalStateException("ModelEngine createModeledEntity a retourne null");
         }
+        this.modeledEntity.registerSelf();
+
+        this.activeModel = ModelEngineAPI.createActiveModel(modelId);
+        if (this.activeModel == null) {
+            throw new IllegalStateException("ModelEngine n'a pas trouve le blueprint: " + modelId);
+        }
+        this.activeModel.setAutoRendererInitialization(true);
+
+        // 3) Player skin mapping: try known APIs in descending order.
+        applyPlayerSkinCompat(player);
+
+        // 4) Attach model and ensure renderer is initialized.
+        if (!addModelCompat()) {
+            boolean blueprintFound = ModelEngineAPI.getBlueprint(modelId) != null;
+            throw new IllegalStateException("Echec lors de l'attachement du modele actif sur la ModeledEntity (modelId=" + modelId + ", blueprintFound=" + blueprintFound + ")");
+        }
+        activeModel.generateModel();
+        activeModel.initializeRenderer();
     }
 
     @Override
@@ -54,8 +81,10 @@ public class ModelEngineDancer implements Dancer {
             dummy.setLocation(danceLocation);
             setRotationCompat(danceLocation.getYaw());
 
-            // Play "dance" animation with runtime-compatible signatures.
-            playDanceAnimationCompat();
+            // Avoid restarting animation every tick
+            if (!activeModel.getAnimationHandler().isPlayingAnimation("dance")) {
+                activeModel.getAnimationHandler().playAnimation("dance", 0.1d, 0.1d, 1.0d, false);
+            }
         }
     }
 
@@ -69,7 +98,19 @@ public class ModelEngineDancer implements Dancer {
         }
     }
 
-    private Dummy<?> createDummyCompat() {
+    private Dummy<?> createDummyCompat(Player player) {
+        // Preferred path for ME 4.0.9: constructors exist on Dummy.
+        try {
+            return new Dummy<>(player);
+        } catch (Throwable ignored) {
+        }
+
+        try {
+            return new Dummy<>();
+        } catch (Throwable ignored) {
+        }
+
+        // Fallback for potential API variants.
         try {
             Method apiGetter = ModelEngineAPI.class.getMethod("getAPI");
             Object api = apiGetter.invoke(null);
@@ -111,14 +152,13 @@ public class ModelEngineDancer implements Dancer {
         invokeIfPresent(dummy, "setPlayerProfile", new Class<?>[]{PlayerProfile.class}, profile);
     }
 
-    private void addModelCompat() {
-        // modeledEntity.addModel(activeModel, true)
-        if (invokeIfPresent(modeledEntity, "addModel", new Class<?>[]{activeModel.getClass(), boolean.class}, activeModel, true)) {
-            return;
-        }
+    private boolean addModelCompat() {
+        Optional<ActiveModel> added = modeledEntity.addModel(activeModel, true);
+        if (added.isPresent()) return true;
 
-        // modeledEntity.addActiveModel(activeModel, true)
-        invokeIfPresent(modeledEntity, "addActiveModel", new Class<?>[]{activeModel.getClass(), boolean.class}, activeModel, true);
+        // Fallback: some blueprints/flags can fail with true
+        added = modeledEntity.addModel(activeModel, false);
+        return added.isPresent();
     }
 
     private void setRotationCompat(float yaw) {
@@ -126,43 +166,22 @@ public class ModelEngineDancer implements Dancer {
         invokeIfPresent(dummy, "setYHeadRot", new Class<?>[]{float.class}, yaw);
     }
 
-    private void playDanceAnimationCompat() {
-        try {
-            Method getAnimationHandler = activeModel.getClass().getMethod("getAnimationHandler");
-            Object handler = getAnimationHandler.invoke(activeModel);
-            if (handler == null) return;
-
-            if (invokeIfPresent(handler, "playAnimation", new Class<?>[]{String.class, double.class, double.class, double.class, boolean.class}, "dance", 0.1d, 0.1d, 1.0d, false)) {
-                return;
-            }
-
-            if (invokeIfPresent(handler, "playAnimation", new Class<?>[]{String.class, int.class, int.class, int.class, boolean.class}, "dance", 0, 0, 1, false)) {
-                return;
-            }
-
-            invokeIfPresent(handler, "playAnimation", new Class<?>[]{String.class}, "dance");
-        } catch (Exception ignored) {
-        }
-    }
-
     private void removeModeledEntityCompat() {
         try {
-            Method entityHandlerGetter = ModelEngineAPI.class.getMethod("getEntityHandler");
-            Object entityHandler = entityHandlerGetter.invoke(null);
-            if (entityHandler != null) {
-                UUID uuid = getDummyUuidCompat();
+            if (activeModel != null && !activeModel.isDestroyed()) {
+                activeModel.destroy();
+            }
+            if (dummy != null) {
+                UUID uuid = dummy.getUUID();
                 if (uuid != null) {
-                    if (!invokeIfPresent(entityHandler, "removeModeledEntity", new Class<?>[]{UUID.class}, uuid)) {
-                        invokeIfPresent(entityHandler, "removeModeledEntity", new Class<?>[]{dummy.getClass()}, dummy);
-                    }
-                } else {
-                    invokeIfPresent(entityHandler, "removeModeledEntity", new Class<?>[]{dummy.getClass()}, dummy);
+                    ModelEngineAPI.removeModeledEntity(uuid);
                 }
+            }
+            if (modeledEntity != null && !modeledEntity.isDestroyed()) {
+                modeledEntity.destroy();
             }
         } catch (Exception ignored) {
         }
-
-        invokeIfPresent(modeledEntity, "destroy", new Class<?>[]{});
     }
 
     private boolean invokeIfPresent(Object target, String methodName, Class<?>[] paramTypes, Object... args) {
@@ -176,18 +195,4 @@ public class ModelEngineDancer implements Dancer {
         }
     }
 
-    private UUID getDummyUuidCompat() {
-        if (dummy == null) return null;
-        for (String methodName : new String[]{"getUniqueId", "getUUID", "getUuid"}) {
-            try {
-                Method m = dummy.getClass().getMethod(methodName);
-                Object v = m.invoke(dummy);
-                if (v instanceof UUID id) {
-                    return id;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        return null;
-    }
 }

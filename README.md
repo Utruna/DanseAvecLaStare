@@ -1,91 +1,138 @@
 # DanseAvecLaStare
 
-Plugin Minecraft (Spigot 1.21.x) permettant aux joueurs de lancer des danses visibles par les autres.
+Plugin Minecraft Paper/Spigot 1.21.x permettant aux joueurs de lancer des danses visibles en jeu.
 
-Cette branche améliore la mise en place initiale en remplaçant l'ArmorStand simple par un NPC (via Citizens) afin d'afficher
-le skin complet du joueur et d'avoir un rendu plus naturel pour les observateurs.
+Le plugin supporte deux moteurs via un pattern Strategy:
 
-## Ce qui a été fait
-
-- Refactorisation des styles : chaque style est une classe (`AbstractDanceStyle` + `*Style`).
-- Remplacement de l'ArmorStand par un NPC player (Citizens) pour afficher le skin complet.
-- Le NPC suit la position/rotation du joueur (mise à jour chaque tick) pour un rendu organique.
-- Option pour cacher le NPC au joueur qui l'a activé (par défaut activée).
-- Commande unique `/danse` avec autocomplétion (styles + `list`/`stop`).
-- Gestion d'erreurs améliorée (logs + stack traces lors d'exception pour faciliter le debug).
+- Citizens (NPC joueur classique)
+- ModelEngine (entité modelée à partir d'un blueprint `.bbmodel`)
 
 ## Fonctionnalités
 
-- Danse visible en temps réel par les autres joueurs (NPC).
-- Styles fournis : `twist`, `spin`, `disco`, `moonwalk`, `wave` (facilement extensible).
-- Contrôle de la visibilité du NPC pour le lanceur (argument optionnel).
+- Commande unique `/danse` avec autocomplétion.
+- Styles disponibles: `twist`, `spin`, `disco`, `moonwalk`, `wave`.
+- Bascule Citizens/ModelEngine via configuration.
+- Commande de diagnostic `/danse debug`.
+- Nettoyage automatique des danses à la déconnexion.
 
 ## Commandes
 
-- `/danse` : lance/arrête la danse par défaut (`twist` si non précisé).
-- `/danse list` : affiche la liste des styles disponibles.
-- `/danse stop` : arrête la danse en cours.
-- `/danse <style> [visible|off|false]` : lance le style donné ; le second argument optionnel contrôle la
-  visibilité du PNJ pour le lanceur. Par défaut le PNJ est caché au lanceur.
+- `/danse` : lance/arrête la danse par défaut (`twist`).
+- `/danse list` : liste des styles.
+- `/danse stop` : arrêt de la danse courante.
+- `/danse debug` : état runtime (plugins détectés, config, blueprint).
+- `/danse <style> [visible|off|false]` : lance un style ; l'argument optionnel agit surtout avec Citizens.
 
-Exemples :
+Exemples:
 
-- `/danse twist` → lance `twist` et cache le PNJ au lanceur.
-- `/danse twist visible` → lance `twist` et laisse le PNJ visible au lanceur.
+- `/danse twist`
+- `/danse twist visible`
+- `/danse debug`
+
+## Configuration
+
+Fichier serveur: `plugins/DanseAvecLaStare/config.yml`
+
+Exemple:
+
+```yml
+useModelEngine: true
+
+modelEngine:
+  defaultModelId: danseur
+  styleModels:
+    twist: danseur
+    spin: visible-test
+    disco: disco-model
+    moonwalk: moonwalk-model
+    wave: wave-model
+```
+
+Règles:
+
+- `useModelEngine: true` active la stratégie ModelEngine (si le plugin ModelEngine est présent).
+- `modelEngine.defaultModelId` est le modèle utilisé par défaut.
+- `modelEngine.styleModels.<style>` permet d'utiliser un modèle différent par danse.
+- Compatibilité maintenue: l'ancienne clé `modelEngine.modelId` est encore lue en fallback.
+
+## Intégration bbmodel (ModelEngine)
+
+1. Placer le fichier `.bbmodel` dans:
+
+  `plugins/ModelEngine/blueprints/`
+
+2. Vérifier le nom/ID:
+
+  si `defaultModelId: danseur`, le blueprint attendu est `danseur`.
+  si `styleModels.spin: visible-test`, alors `/danse spin` utilisera `visible-test`.
+
+3. Le blueprint doit contenir une animation nommée exactement:
+
+  `dance`
+
+4. Recharger ModelEngine:
+
+  `/meg reload` (ou redémarrage serveur)
+
+5. Vérifier avec:
+
+  `/danse debug`
+
+Important:
+
+- Le modèle magenta/noir indique en général un problème de textures/resource pack, pas forcément de logique plugin.
+- Le skin joueur dynamique nécessite un blueprint préparé pour le Player Skin Mapping.
 
 ## Installation
 
-Prérequis serveur :
+Prérequis serveur:
 
 - Java 21
 - Paper/Spigot 1.21.x
-- Citizens plugin (installé sur le serveur)
+- Citizens (optionnel)
+- ModelEngine 4.0.9 (optionnel, requis pour la stratégie bbmodel)
 
-Étapes :
-
-1. Compiler :
+Build local:
 
 ```bash
 mvn clean package
 ```
 
-2. Copier `target/DanseAvecLaStare-1.0.0-SNAPSHOT.jar` dans `plugins/`.
-3. Installer `Citizens` et redémarrer le serveur.
+Déploiement:
 
-## Développement
+1. Copier `target/DanseAvecLaStare-1.0.0-SNAPSHOT.jar` dans `plugins/`.
+2. Vérifier `plugins/DanseAvecLaStare/config.yml`.
+3. Redémarrer le serveur.
 
-Prérequis locaux :
+## Dépendance ModelEngine (développement)
 
-- Maven 3.9+
-- JDK 21
-
-Exécuter les tests unitaires :
+ModelEngine étant souvent distribué hors dépôt Maven public, installer le jar localement en `.m2`:
 
 ```bash
-mvn test
+mvn install:install-file -Dfile=libs/ModelEngine-4.0.9.jar -DgroupId=com.ticxo.modelengine -DartifactId=ModelEngine-API -Dversion=4.0.9 -Dpackaging=jar -DgeneratePom=true
 ```
 
-Les tests couvrent la logique des styles et du parsing. Le comportement runtime (NPC/skin) nécessite un serveur avec `Citizens`.
+Puis compiler normalement.
 
 ## Structure du code
 
-- `DanseAvecLaStare.java` — point d'entrée, commande et tab completion.
-- `managers/DanceManager.java` — gestion des danses, création/destruction de NPC, boucle d'animation.
-- `managers/DanceStyle.java`, `AbstractDanceStyle.java`, `*Style.java` — implémentations des styles.
-- `listeners/PlayerListener.java` — nettoyage des danses si le joueur quitte.
+- `src/main/java/me/utruna/danse/DanseAvecLaStare.java`: point d'entrée, commande, debug.
+- `src/main/java/me/utruna/danse/managers/DanceManager.java`: orchestration de la stratégie active.
+- `src/main/java/me/utruna/danse/managers/Dancer.java`: contrat Strategy.
+- `src/main/java/me/utruna/danse/managers/CitizensDancer.java`: implémentation Citizens.
+- `src/main/java/me/utruna/danse/managers/ModelEngineDancer.java`: implémentation ModelEngine.
+- `src/main/java/me/utruna/danse/listeners/PlayerListener.java`: cleanup joueur.
 
-## Debug & Troubleshooting
+## Troubleshooting rapide
 
-- Si la commande plante : regarde les logs du serveur, le plugin logge les stack traces pour faciliter le debug.
-- Si le skin ne s'applique pas, le plugin essaie plusieurs approches (réflexion sur différentes versions de `SkinTrait`).
-  Si rien ne fonctionne le NPC sera spawn sans skin.
-- Assure-toi de la compatibilité de `Citizens` avec ta version de serveur.
+- Rien ne s'affiche: vérifier `/danse debug`, `useModelEngine`, `modelId`, présence blueprint.
+- Erreur d'attachement modèle: vérifier l'ID blueprint et la compatibilité du `.bbmodel`.
+- Cube magenta/noir: corriger textures/materials et resource pack ModelEngine.
+- Pas d'animation: vérifier que `dance` existe dans le blueprint.
 
-## Prochaines améliorations possibles
+## Documentation complémentaire
 
-- Ajouter un fallback ProtocolLib (implémentation de NPC via packets) pour éviter la dépendance Citizens.
-- Ajouter `config.yml` pour des préférences par défaut (ex. `hideByDefault`).
-- Persistance des préférences par joueur.
+Voir `docs/BBMODEL_INTEGRATION.md` pour le guide détaillé d'implémentation bbmodel.
 
 ## Auteur
 

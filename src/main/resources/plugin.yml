@@ -7,4 +7,4 @@ softdepend: [Citizens, ModelEngine]
 commands:
   danse:
     description: Lance ou arrête une danse
-    usage: /danse [twist|spin|disco|moonwalk|wave|list|stop]
+    usage: /danse [twist|spin|disco|moonwalk|wave|list|stop|debug]

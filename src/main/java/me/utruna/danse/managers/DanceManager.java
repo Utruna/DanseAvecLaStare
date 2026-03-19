@@ -83,7 +83,8 @@ public class DanceManager {
 
         Dancer dancer;
         if (useModelEngine) {
-            dancer = new ModelEngineDancer();
+            String modelId = resolveModelIdForStyle(style);
+            dancer = new ModelEngineDancer(modelId);
         } else {
             if (!Bukkit.getPluginManager().isPluginEnabled("Citizens") || !CitizensAPI.hasImplementation()) {
                 player.sendMessage("§cCitizens est requis pour la danse avec skin complet.");
@@ -155,6 +156,28 @@ public class DanceManager {
         for (UUID uuid : runningDances.keySet()) {
             stopDance(uuid);
         }
+    }
+
+    private String resolveModelIdForStyle(DanceStyle style) {
+        String styleName = style.getName().toLowerCase(Locale.ROOT);
+
+        String byStyle = plugin.getConfig().getString("modelEngine.styleModels." + styleName);
+        if (byStyle != null && !byStyle.isBlank()) {
+            return byStyle.trim();
+        }
+
+        String defaultModel = plugin.getConfig().getString("modelEngine.defaultModelId");
+        if (defaultModel != null && !defaultModel.isBlank()) {
+            return defaultModel.trim();
+        }
+
+        // Backward compatibility for old config key.
+        String legacy = plugin.getConfig().getString("modelEngine.modelId");
+        if (legacy != null && !legacy.isBlank()) {
+            return legacy.trim();
+        }
+
+        return "danseur";
     }
 
     // Styles are implemented in dedicated classes under the same package.

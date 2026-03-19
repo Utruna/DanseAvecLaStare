@@ -12,8 +12,11 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
 import java.io.File;
+import java.util.HashSet;
+import java.util.Set;
 
 public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
 
@@ -21,7 +24,13 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
 
     @Override
     public void onEnable() {
+        saveDefaultConfig();
+        reloadConfig();
+
         danceManager = new DanceManager(this);
+
+        getLogger().info("Config chargee depuis: " + getDataFolder().getAbsolutePath() + File.separator + "config.yml");
+        getLogger().info("Option useModelEngine=" + getConfig().getBoolean("useModelEngine", false));
 
         if (getServer().getPluginManager().isPluginEnabled("ModelEngine")) {
             checkModelEngineBlueprints();
@@ -39,6 +48,7 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
                     List<String> base = danceManager.getStyleNames();
                     base.add("list");
                     base.add("stop");
+                        base.add("debug");
                     return base.stream()
                             .filter(s -> s.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
@@ -59,16 +69,19 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
     private void checkModelEngineBlueprints() {
         File modelEngineFolder = new File(getDataFolder().getParentFile(), "ModelEngine");
         File blueprintsFolder = new File(modelEngineFolder, "blueprints");
-        File modelFile = new File(blueprintsFolder, "danseur.bbmodel");
 
-        if (!modelFile.exists()) {
-            getLogger().severe("========================================");
-            getLogger().severe("[DanseAvecLaStare] ATTENTION: Le fichier de modèle 'danseur.bbmodel' est introuvable !");
-            getLogger().severe("[DanseAvecLaStare] Veuillez le placer dans le dossier : " + blueprintsFolder.getPath());
-            getLogger().severe("[DanseAvecLaStare] Sans ce fichier, l'animation de danse via ModelEngine ne fonctionnera pas.");
-            getLogger().severe("========================================");
-        } else {
-            getLogger().info("[DanseAvecLaStare] Modèle 'danseur.bbmodel' trouvé avec succès dans ModelEngine.");
+        Set<String> modelIds = resolveConfiguredModelIds();
+        for (String modelId : modelIds) {
+            File modelFile = new File(blueprintsFolder, modelId + ".bbmodel");
+            if (!modelFile.exists()) {
+                getLogger().severe("========================================");
+                getLogger().severe("[DanseAvecLaStare] ATTENTION: Le fichier de modèle '" + modelId + ".bbmodel' est introuvable !");
+                getLogger().severe("[DanseAvecLaStare] Veuillez le placer dans le dossier : " + blueprintsFolder.getPath());
+                getLogger().severe("[DanseAvecLaStare] Sans ce fichier, la danse liée à ce modèle ne fonctionnera pas.");
+                getLogger().severe("========================================");
+            } else {
+                getLogger().info("[DanseAvecLaStare] Modèle '" + modelId + ".bbmodel' trouvé avec succès dans ModelEngine.");
+            }
         }
     }
 
@@ -76,6 +89,11 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (command.getName().equalsIgnoreCase("danse")) {
             try {
+            if (args.length > 0 && args[0].equalsIgnoreCase("debug")) {
+                sendDebugStatus(sender);
+                return true;
+            }
+
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("Seul un joueur peut utiliser cette commande.");
                 return true;
@@ -130,6 +148,64 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
         }
 
         return false;
+    }
+
+    private void sendDebugStatus(CommandSender sender) {
+        boolean modelEngineEnabled = getServer().getPluginManager().isPluginEnabled("ModelEngine");
+        boolean citizensEnabled = getServer().getPluginManager().isPluginEnabled("Citizens");
+        boolean useModelEngine = getConfig().getBoolean("useModelEngine", false);
+
+        File configFile = new File(getDataFolder(), "config.yml");
+        File modelEngineFolder = new File(getDataFolder().getParentFile(), "ModelEngine");
+        File blueprintsFolder = new File(modelEngineFolder, "blueprints");
+        String defaultModelId = getConfig().getString("modelEngine.defaultModelId",
+            getConfig().getString("modelEngine.modelId", "danseur"));
+        File modelFile = new File(blueprintsFolder, defaultModelId + ".bbmodel");
+        ConfigurationSection styleModels = getConfig().getConfigurationSection("modelEngine.styleModels");
+
+        sender.sendMessage("§6[Danse Debug]§r");
+        sender.sendMessage("§eConfig chargee: §f" + configFile.getAbsolutePath());
+        sender.sendMessage("§euseModelEngine: §f" + useModelEngine);
+        sender.sendMessage("§ePlugin ModelEngine actif: §f" + modelEngineEnabled);
+        sender.sendMessage("§ePlugin Citizens actif: §f" + citizensEnabled);
+        sender.sendMessage("§emodelEngine.defaultModelId: §f" + defaultModelId);
+        if (styleModels != null && !styleModels.getKeys(false).isEmpty()) {
+            sender.sendMessage("§emodelEngine.styleModels: §f" + styleModels.getValues(false));
+        }
+        sender.sendMessage("§eBlueprint attendu: §f" + modelFile.getAbsolutePath());
+        sender.sendMessage("§eBlueprint present: §f" + modelFile.exists());
+
+        if (modelEngineEnabled && useModelEngine && modelFile.exists()) {
+            sender.sendMessage("§aMode actif attendu: ModelEngine");
+        } else {
+            sender.sendMessage("§cMode actif probable: Citizens (ou erreur de config ModelEngine)");
+        }
+    }
+
+    private Set<String> resolveConfiguredModelIds() {
+        Set<String> modelIds = new HashSet<>();
+
+        String defaultModelId = getConfig().getString("modelEngine.defaultModelId",
+                getConfig().getString("modelEngine.modelId", "danseur"));
+        if (defaultModelId != null && !defaultModelId.isBlank()) {
+            modelIds.add(defaultModelId.trim());
+        }
+
+        ConfigurationSection styleModels = getConfig().getConfigurationSection("modelEngine.styleModels");
+        if (styleModels != null) {
+            for (String style : styleModels.getKeys(false)) {
+                String modelId = styleModels.getString(style);
+                if (modelId != null && !modelId.isBlank()) {
+                    modelIds.add(modelId.trim());
+                }
+            }
+        }
+
+        if (modelIds.isEmpty()) {
+            modelIds.add("danseur");
+        }
+
+        return modelIds;
     }
 
     public DanceManager getDanceManager() {

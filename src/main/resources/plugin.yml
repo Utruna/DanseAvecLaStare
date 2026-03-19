@@ -3,7 +3,7 @@ version: 1.0.0-SNAPSHOT
 name: DanseAvecLaStare
 author: Utruna
 api-version: 1.21
-softdepend: [Citizens]
+softdepend: [Citizens, ModelEngine]
 commands:
   danse:
     description: Lance ou arrête une danse

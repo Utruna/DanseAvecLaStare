@@ -83,7 +83,8 @@ public class DanceManager {
 
         Dancer dancer;
         if (useModelEngine) {
-            dancer = new ModelEngineDancer();
+            String modelId = plugin.getConfig().getString("modelEngine.modelId", "danseur");
+            dancer = new ModelEngineDancer(modelId);
         } else {
             if (!Bukkit.getPluginManager().isPluginEnabled("Citizens") || !CitizensAPI.hasImplementation()) {
                 player.sendMessage("§cCitizens est requis pour la danse avec skin complet.");

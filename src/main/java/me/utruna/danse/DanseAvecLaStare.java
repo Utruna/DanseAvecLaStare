@@ -21,7 +21,13 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
 
     @Override
     public void onEnable() {
+        saveDefaultConfig();
+        reloadConfig();
+
         danceManager = new DanceManager(this);
+
+        getLogger().info("Config chargee depuis: " + getDataFolder().getAbsolutePath() + File.separator + "config.yml");
+        getLogger().info("Option useModelEngine=" + getConfig().getBoolean("useModelEngine", false));
 
         if (getServer().getPluginManager().isPluginEnabled("ModelEngine")) {
             checkModelEngineBlueprints();
@@ -39,6 +45,7 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
                     List<String> base = danceManager.getStyleNames();
                     base.add("list");
                     base.add("stop");
+                        base.add("debug");
                     return base.stream()
                             .filter(s -> s.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
@@ -76,6 +83,11 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (command.getName().equalsIgnoreCase("danse")) {
             try {
+            if (args.length > 0 && args[0].equalsIgnoreCase("debug")) {
+                sendDebugStatus(sender);
+                return true;
+            }
+
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("Seul un joueur peut utiliser cette commande.");
                 return true;
@@ -130,6 +142,31 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
         }
 
         return false;
+    }
+
+    private void sendDebugStatus(CommandSender sender) {
+        boolean modelEngineEnabled = getServer().getPluginManager().isPluginEnabled("ModelEngine");
+        boolean citizensEnabled = getServer().getPluginManager().isPluginEnabled("Citizens");
+        boolean useModelEngine = getConfig().getBoolean("useModelEngine", false);
+
+        File configFile = new File(getDataFolder(), "config.yml");
+        File modelEngineFolder = new File(getDataFolder().getParentFile(), "ModelEngine");
+        File blueprintsFolder = new File(modelEngineFolder, "blueprints");
+        File modelFile = new File(blueprintsFolder, "danseur.bbmodel");
+
+        sender.sendMessage("§6[Danse Debug]§r");
+        sender.sendMessage("§eConfig chargee: §f" + configFile.getAbsolutePath());
+        sender.sendMessage("§euseModelEngine: §f" + useModelEngine);
+        sender.sendMessage("§ePlugin ModelEngine actif: §f" + modelEngineEnabled);
+        sender.sendMessage("§ePlugin Citizens actif: §f" + citizensEnabled);
+        sender.sendMessage("§eBlueprint attendu: §f" + modelFile.getAbsolutePath());
+        sender.sendMessage("§eBlueprint present: §f" + modelFile.exists());
+
+        if (modelEngineEnabled && useModelEngine && modelFile.exists()) {
+            sender.sendMessage("§aMode actif attendu: ModelEngine");
+        } else {
+            sender.sendMessage("§cMode actif probable: Citizens (ou erreur de config ModelEngine)");
+        }
     }
 
     public DanceManager getDanceManager() {

@@ -41,8 +41,7 @@
             <groupId>com.ticxo.modelengine</groupId>
             <artifactId>ModelEngine-API</artifactId>
             <version>4.0.9</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/libs/ModelEngine-4.0.9.jar</systemPath>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -89,6 +88,7 @@
                 <filtering>true</filtering>
                 <includes>
                     <include>plugin.yml</include>
+                    <include>config.yml</include>
                 </includes>
             </resource>
         </resources>

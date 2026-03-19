@@ -1,0 +1,8 @@
+# Strategy switch
+# true = use ModelEngine when plugin is present
+# false = fallback to Citizens implementation
+useModelEngine: true
+
+modelEngine:
+	# Blueprint id (usually matching your .bbmodel name without extension)
+	modelId: danseur

@@ -13,6 +13,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
+import java.io.File;
 
 public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
 
@@ -21,6 +22,10 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
     @Override
     public void onEnable() {
         danceManager = new DanceManager(this);
+
+        if (getServer().getPluginManager().isPluginEnabled("ModelEngine")) {
+            checkModelEngineBlueprints();
+        }
 
         getLogger().info("Le plugin de danse est prêt !");
         getServer().getPluginManager().registerEvents(new PlayerListener(danceManager), this);
@@ -49,6 +54,22 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
             danceManager.stopAll();
         }
         getLogger().info("Arrêt du plugin de danse.");
+    }
+
+    private void checkModelEngineBlueprints() {
+        File modelEngineFolder = new File(getDataFolder().getParentFile(), "ModelEngine");
+        File blueprintsFolder = new File(modelEngineFolder, "blueprints");
+        File modelFile = new File(blueprintsFolder, "danseur.bbmodel");
+
+        if (!modelFile.exists()) {
+            getLogger().severe("========================================");
+            getLogger().severe("[DanseAvecLaStare] ATTENTION: Le fichier de modèle 'danseur.bbmodel' est introuvable !");
+            getLogger().severe("[DanseAvecLaStare] Veuillez le placer dans le dossier : " + blueprintsFolder.getPath());
+            getLogger().severe("[DanseAvecLaStare] Sans ce fichier, l'animation de danse via ModelEngine ne fonctionnera pas.");
+            getLogger().severe("========================================");
+        } else {
+            getLogger().info("[DanseAvecLaStare] Modèle 'danseur.bbmodel' trouvé avec succès dans ModelEngine.");
+        }
     }
 
     @Override

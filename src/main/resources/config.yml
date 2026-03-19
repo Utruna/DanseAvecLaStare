@@ -4,5 +4,15 @@
 useModelEngine: true
 
 modelEngine:
-	# Blueprint id (usually matching your .bbmodel name without extension)
-	modelId: danseur
+	# Default blueprint id used when no per-style mapping exists.
+	# Usually matching your .bbmodel name without extension.
+	defaultModelId: danseur
+
+	# Optional per-style overrides.
+	# This allows using multiple bbmodels (one per dance style).
+	styleModels:
+		twist: danseur
+		spin: danseur
+		disco: danseur
+		moonwalk: danseur
+		wave: danseur

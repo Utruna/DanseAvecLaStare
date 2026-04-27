@@ -55,39 +55,39 @@ Règles:
 - `modelEngine.styleModels.<style>` permet d'utiliser un modèle différent par danse.
 - Compatibilité maintenue: l'ancienne clé `modelEngine.modelId` est encore lue en fallback.
 
-## Intégration bbmodel (ModelEngine)
+## Les 2 Stratégies d'animation : Citizens vs ModelEngine
 
-1. Placer le fichier `.bbmodel` dans:
+### 1. Stratégie Citizens (Mode par défaut sans pack)
+- **Avantage** : Ne nécessite **aucun pack de ressources** pour les joueurs.
+- **Inconvénient** : Les mouvements sont strictement limités aux animations de Minecraft Vanilla (lever le bras, s'accroupir, avancer). Il est techniquement impossible d'utiliser des fichiers `.bbmodel` ou des animations fluides complexes sur un vrai "faux joueur" de type Citizens.
 
-  `plugins/ModelEngine/blueprints/`
+### 2. Stratégie ModelEngine (Mode avancé)
+- **Avantage** : Permet des danses ultra-fluides, complexes, et totalement personnalisées via Blockbench (`.bbmodel`).
+- **Inconvénient** : **Nécessite obligatoirement un Pack de Ressources** (Resource Pack) généré par ModelEngine pour afficher les modèles aux joueurs. Sans ce pack, les joueurs verront un gros cube rose et noir (texture manquante).
 
-2. Vérifier le nom/ID:
+## Intégration bbmodel (Blockbench -> ModelEngine)
 
-  si `defaultModelId: danseur`, le blueprint attendu est `danseur`.
-  si `styleModels.spin: visible-test`, alors `/danse spin` utilisera `visible-test`.
+Pour que ModelEngine accepte et charge correctement votre modèle de danseur, le fichier `.bbmodel` doit respecter **strictement** ces règles :
 
-3. Le blueprint doit contenir une animation nommée exactement:
+1. **Type de projet** : Le projet Blockbench doit être impérativement un **Modèle d'entité Bedrock (Bedrock Entity)**. Les formats "Generic Model" ou "Free Model" de BlockBench v5 vont faire crasher l'import.
+2. **Nomenclature des Os (Bones)** : Les dossiers (qui représentent les os) doivent être en minuscules et **SANS AUCUN ESPACE**. (ex: `head`, `body`, `right_arm`, `left_arm`, `right_leg`, `left_leg`, `hitbox`).
+3. **Animation** : Le plugin ciblera par défaut l'animation nommée `dance`. *(Nouveau : s'il ne la trouve pas, il jouera automatiquement la première animation disponible dans le fichier)*.
+4. **Texture dynamique du Joueur (p_skin)** : Dans Blockbench, la texture doit commencer par le préfixe `p_` (ex: `p_skin` ou `p_steve`) pour indiquer à ModelEngine qu'il doit décalquer le vrai skin du joueur du serveur sur cette texture en temps réel.
+5. Mettez le fichier `.bbmodel` dans `plugins/ModelEngine/models/` (ou `blueprints/` selon version).
+6. Tapez `/meg reload models` sur le serveur. La console doit renvoyer un message d'importation sans erreurs !
 
-  `dance`
+## Pack de Ressources (Le cube Rose et Noir)
 
-4. Recharger ModelEngine:
-
-  `/meg reload` (ou redémarrage serveur)
-
-5. Vérifier avec:
-
-  `/danse debug`
-
-Important:
-
-- Le modèle magenta/noir indique en général un problème de textures/resource pack, pas forcément de logique plugin.
-- Le skin joueur dynamique nécessite un blueprint préparé pour le Player Skin Mapping.
+Si vous voyez un grand cube rose et noir à la place de votre personnage :
+Cela signifie que le serveur et le plugin **fonctionnent parfaitement**, mais que votre jeu Minecraft (client) n'a pas téléchargé le pack de ressources.
+- **Pour tester localement** : Récupérez le fichier `ModelEngine.zip` dans le dossier `plugins/ModelEngine/resource pack/` du serveur, mettez-le dans le dossier `resourcepacks` de votre Minecraft et activez-le.
+- **Pour les joueurs du serveur** : Hébergez ce `.zip` en ligne et mettez le lien dans le `server.properties` (`resource-pack=...`).
 
 ## Installation
 
 Prérequis serveur:
 
-- Java 21
+- Java 25 (LTS)
 - Paper/Spigot 1.21.x
 - Citizens (optionnel)
 - ModelEngine 4.0.9 (optionnel, requis pour la stratégie bbmodel)

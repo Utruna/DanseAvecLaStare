@@ -1,115 +1,42 @@
-# Guide d'integration bbmodel (ModelEngine)
+BBMODEL_INTEGRATION.md
+# Guide d'intégration bbmodel pour ModelEngine 4
 
-Ce document explique comment integrer correctement un modele `.bbmodel` avec DanseAvecLaStare.
+Ce document est destiné aux **animateurs et modélisateurs** pour préparer les fichiers `.bbmodel` pour le plugin DanseAvecLaStare.
 
-## 1. Prerequis
+## 1. Emplacement des fichiers
+Les fichiers `.bbmodel` doivent être placés dans :
+`plugins/ModelEngine/models/`
 
-- Paper/Spigot 1.21.x
-- ModelEngine 4.0.9 installe et actif
-- DanseAvecLaStare deploye
-- Resource pack ModelEngine fonctionnel cote client
+*Note : Ne pas les mettre dans le dossier blueprints/.*
 
-## 2. Emplacement des modeles
+## 2. Règles Blockbench (VITAL)
 
-Placer les blueprints dans:
+### A. ID de la Texture (Le Skin)
+Pour que le skin du joueur s'affiche sur le modèle :
+- Dans Blockbench, allez dans l'onglet **Textures**.
+- Faites un clic droit sur votre texture > **Propriétés**.
+- L'**ID** de la texture doit commencer par `p_` (ex: `p_skin`, `p_steve`, `p_player`).
+- **Sans ce préfixe, le modèle restera bleu.**
 
-`plugins/ModelEngine/blueprints/`
+### B. Nom de l'Animation
+Le plugin déclenche une animation précise.
+- Dans l'onglet **Animations**, votre animation de danse doit s'appeler : **`dance`**.
+- Attention : respectez la casse (minuscules uniquement).
 
-Exemples:
+### C. Exportation
+- Enregistrez simplement votre projet en tant que fichier **`.bbmodel`**.
+- Utilisez des noms de fichiers simples, sans espaces ni majuscules (ex: `twist.bbmodel`).
 
-- `plugins/ModelEngine/blueprints/danseur.bbmodel`
-- `plugins/ModelEngine/blueprints/visible-test.bbmodel`
+## 3. Workflow de test
+1. Placer le fichier dans `plugins/ModelEngine/models/`.
+2. Taper `/meg reload models` sur le serveur.
+3. **Récupérer le Resource Pack** : ModelEngine génère un ZIP dans `plugins/ModelEngine/resource pack/`. Installez ce pack sur votre Minecraft.
+4. Tester la danse avec `/danse <style>`.
 
-## 3. Configuration du plugin
+## 4. Résolution de problèmes
+- **Modèle invisible** : Vérifiez le nom du fichier et faites `/meg reload models`.
+- **Modèle figé** : L'animation ne s'appelle pas `dance`.
+- **Modèle bleu** : L'ID de texture ne commence pas par `p_`.
+- **Cube violet/noir** : Chargez le resource pack généré par le serveur.
 
-Fichier a editer sur le serveur:
 
-`plugins/DanseAvecLaStare/config.yml`
-
-Configuration minimale:
-
-```yml
-useModelEngine: true
-
-modelEngine:
-  defaultModelId: danseur
-  styleModels:
-    twist: danseur
-    spin: visible-test
-```
-
-Regle importante:
-
-- `defaultModelId` sert de fallback global.
-- `styleModels.<style>` permet de mapper chaque danse vers un blueprint specifique.
-- L'ancienne cle `modelEngine.modelId` reste supportee en fallback.
-
-## 4. Exigences du blueprint
-
-- Le blueprint doit etre charge par ModelEngine.
-- Le blueprint doit contenir une animation nommee exactement `dance`.
-- Si objectif skin dynamique joueur:
-  - le blueprint doit etre prepare pour Player Skin Mapping
-  - UV et materiaux doivent etre compatibles avec le rendu skin attendu
-
-## 5. Cycle de test
-
-1. Redemarrer le serveur (recommande) ou `/meg reload`.
-2. Lancer `/danse debug`.
-3. Verifier:
-   - ModelEngine actif
-   - `useModelEngine=true`
-  - `defaultModelId` correct
-  - mapping `styleModels` correct
-  - blueprint(s) present(s)
-4. Lancer `/danse twist`.
-5. Verifier:
-   - modele visible
-   - animation `dance` active
-
-## 6. Erreurs frequentes
-
-### 6.1 Rien ne s'affiche
-
-Verifier:
-
-- `useModelEngine` active dans le bon config serveur
-- `modelId` correct
-- plugin ModelEngine actif
-- blueprint present
-
-### 6.2 Cube rose/noir (magenta/noir)
-
-Cause probable: texture manquante ou resource pack non applique.
-
-Actions:
-
-- verifier les chemins de textures dans le blueprint
-- regenerer/recharger le pack ModelEngine
-- verifier que le client accepte le pack
-
-### 6.3 Le modele apparait mais n'anime pas
-
-Cause probable: animation `dance` absente ou nom differente.
-
-Action: renommer/ajouter l'animation `dance` dans le `.bbmodel`.
-
-### 6.4 Le skin joueur ne s'applique pas
-
-Cause probable: blueprint non prepare pour Player Skin Mapping.
-
-Action: adapter le modele (UV/materials) a un workflow skin joueur.
-
-## 7. Commandes utiles
-
-- `/danse debug`
-- `/danse list`
-- `/danse twist`
-- `/danse stop`
-- `/meg reload`
-
-## 8. Rappel implementation code
-
-- Le choix Citizens/ModelEngine est gere dans `DanceManager`.
-- Le rendu bbmodel est gere dans `ModelEngineDancer`.
-- Le modele utilise est configurable via `modelEngine.modelId`.

@@ -81,6 +81,18 @@ public class DanceManager {
                 finishDanceSetup(player, dancer, style, hideFromOwner);
             });
             return;
+        }
+
+        final UUID uuid = player.getUniqueId();
+        final Location origin = player.getLocation().clone();
+
+        boolean useModelEngine = Bukkit.getPluginManager().isPluginEnabled("ModelEngine") 
+            && plugin.getConfig().getBoolean("useModelEngine", false);
+
+        Dancer dancer;
+        if (useModelEngine) {
+            String modelId = resolveModelIdForStyle(style);
+            dancer = new ModelEngineDancer(modelId);
         } else {
             // Logique normale pour le joueur lui-même
             ModelEngineDancer dancer = new ModelEngineDancer(plugin, resolveModelIdForStyle(style), null); 

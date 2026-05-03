@@ -6,7 +6,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
-
+import me.utruna.danse.managers.SkinService;
+import org.bukkit.profile.PlayerProfile;
+import java.util.function.Consumer;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -64,37 +66,33 @@ public class DanceManager {
     }
 
     public void startDance(Player player, DanceStyle style) {
-        startDance(player, style, true);
+        startDance(player, style, true, null);
     }
-
-    public void startDance(Player player, DanceStyle style, boolean hideFromOwner) {
+    public void startDance(Player player, DanceStyle style, boolean hideFromOwner, String targetName) {
         stopDance(player.getUniqueId());
 
-        if (style == null) {
-            player.sendMessage("§cStyle de danse invalide.");
+        if (targetName != null && !targetName.isBlank()) {
+            SkinService.fetchSkin(plugin, targetName.trim(), (profile) -> {
+                if (profile == null) {
+                    player.sendMessage("§cJoueur introuvable ou erreur API.");
+                    return;
+                }
+                ModelEngineDancer dancer = new ModelEngineDancer(plugin, resolveModelIdForStyle(style), profile);
+                finishDanceSetup(player, dancer, style, hideFromOwner);
+            });
             return;
-        }
-
-        final UUID uuid = player.getUniqueId();
-        final Location origin = player.getLocation().clone();
-
-        boolean useModelEngine = Bukkit.getPluginManager().isPluginEnabled("ModelEngine") 
-            && plugin.getConfig().getBoolean("useModelEngine", false);
-
-        Dancer dancer;
-        if (useModelEngine) {
-            String modelId = resolveModelIdForStyle(style); 
-            dancer = new ModelEngineDancer(plugin, modelId);
         } else {
-            if (!Bukkit.getPluginManager().isPluginEnabled("Citizens") || !CitizensAPI.hasImplementation()) {
-                player.sendMessage("§cCitizens est requis pour la danse avec skin complet.");
-                return;
-            }
-            CitizensDancer citizensDancer = new CitizensDancer(plugin);
-            citizensDancer.setHiddenFromOwner(hideFromOwner);
-            dancer = citizensDancer;
+            // Logique normale pour le joueur lui-même
+            ModelEngineDancer dancer = new ModelEngineDancer(plugin, resolveModelIdForStyle(style), null); 
+            // NOTE: Si skinProfile est null dans ModelEngineDancer, 
+            // modifie le constructeur pour accepter null et faire new Dummy<>(player)
+            finishDanceSetup(player, dancer, style, hideFromOwner);
         }
-
+    }
+    /**
+     * Helper pour démarrer une danse avec un Dancer déjà configuré
+     */
+    private void startDanceWithDancer(UUID uuid, Player player, Location origin, Dancer dancer, DanceStyle style, boolean hideFromOwner) {
         try {
             dancer.spawn(origin, player);
 
@@ -102,7 +100,6 @@ public class DanceManager {
             running.dancer = dancer;
             running.previousInvisible = player.isInvisible();
 
-            // On rend le vrai joueur invisible
             player.setInvisible(true);
 
             BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
@@ -110,23 +107,21 @@ public class DanceManager {
 
                 @Override
                 public void run() {
-                    // 1. Vérification de sécurité : Si le joueur quitte ou meurt, on arrête tout
                     Player online = Bukkit.getPlayer(uuid);
                     if (online == null || !online.isOnline() || online.isDead()) {
                         stopDance(uuid);
                         return;
                     }
 
-                    // 2. Animation via la stratégie
                     dancer.tick(tick, style);
                     tick++;
                 }
-            }, 0L, 1L); // 1L pour une fluidité de 20 images par seconde
+            }, 0L, 1L);
 
             running.task = task;
             runningDances.put(uuid, running);
         } catch (Exception ex) {
-            plugin.getLogger().log(Level.SEVERE, "Erreur lors de la création du NPC pour la danse", ex);
+            plugin.getLogger().log(Level.SEVERE, "Erreur lors de la création de la danse", ex);
             StringWriter sw = new StringWriter();
             ex.printStackTrace(new PrintWriter(sw));
             plugin.getLogger().severe(sw.toString());
@@ -135,6 +130,59 @@ public class DanceManager {
                 if (p != null) p.setInvisible(false);
             } catch (Exception ignore) {}
         }
+    }
+    /**
+     * Récupère la paire [value, signature] pour le skin d'un pseudo Mojang.
+     * Tente d'abord d'utiliser une API Paper via reflection, puis tombe en fallback HTTP.
+     */
+    private String[] fetchSkinData(String username) {
+        try {
+            // Attempt to use Mojang APIs via HTTP (reliable)
+            // 1) Get UUID
+            String uuidUrl = "https://api.mojang.com/users/profiles/minecraft/" + java.net.URLEncoder.encode(username, java.nio.charset.StandardCharsets.UTF_8);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(uuidUrl).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            int code = conn.getResponseCode();
+            if (code != 200) return null;
+            java.io.BufferedReader in = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = in.readLine()) != null) sb.append(line).append('\n');
+            in.close();
+            String body = sb.toString();
+            // extract id
+            java.util.regex.Pattern idPattern = java.util.regex.Pattern.compile("\"id\"\s*:\s*\"([0-9a-fA-F]+)\"");
+            java.util.regex.Matcher idMatcher = idPattern.matcher(body);
+            if (!idMatcher.find()) return null;
+            String uuid = idMatcher.group(1);
+
+            // 2) Query session server
+            String profileUrl = "https://sessionserver.mojang.com/session/minecraft/profile/" + uuid + "?unsigned=false";
+            conn = (java.net.HttpURLConnection) new java.net.URL(profileUrl).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            code = conn.getResponseCode();
+            if (code != 200) return null;
+            in = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8));
+            sb = new StringBuilder();
+            while ((line = in.readLine()) != null) sb.append(line).append('\n');
+            in.close();
+            body = sb.toString();
+
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile("\"name\"\s*:\s*\"textures\".*?\"value\"\s*:\s*\"([^\"]+)\".*?\"signature\"\s*:\s*\"([^\"]+)\"", java.util.regex.Pattern.DOTALL);
+            java.util.regex.Matcher m = p.matcher(body);
+            if (m.find()) {
+                String value = m.group(1);
+                String signature = m.group(2);
+                return new String[]{value, signature};
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Erreur fetchSkinData: " + e.getMessage());
+        }
+        return null;
     }
 
     public void stopDance(UUID uuid) {
@@ -180,5 +228,45 @@ public class DanceManager {
         return "danseur";
     }
 
+
+    private void finishDanceSetup(Player player, Dancer dancer, DanceStyle style, boolean hideFromOwner) {
+        final UUID uuid = player.getUniqueId();
+        final Location origin = player.getLocation().clone();
+
+        try {
+            dancer.spawn(origin, player);
+
+            RunningDance running = new RunningDance();
+            running.dancer = dancer;
+            running.previousInvisible = player.isInvisible();
+
+            player.setInvisible(true);
+
+            BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+                private int tick = 0;
+
+                @Override
+                public void run() {
+                    Player online = Bukkit.getPlayer(uuid);
+                    if (online == null || !online.isOnline() || online.isDead()) {
+                        stopDance(uuid);
+                        return;
+                    }
+                    dancer.tick(tick, style);
+                    tick++;
+                }
+            }, 0L, 1L);
+
+            running.task = task;
+            runningDances.put(uuid, running);
+
+        } catch (Exception ex) {
+            plugin.getLogger().log(Level.SEVERE, "Erreur lors du spawn du danseur", ex);
+            try {
+                Player p = Bukkit.getPlayer(uuid);
+                if (p != null) p.setInvisible(false);
+            } catch (Exception ignore) {}
+        }
+    }
     // Styles are implemented in dedicated classes under the same package.
 }

@@ -73,4 +73,6 @@ Pour que ModelEngine génère correctement le danseur et applique le skin du jou
 ## Auteur
 Utruna
 
+## Animations
+- **Twist** : chipie7846 (Discord)
 

@@ -8,7 +8,9 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.configuration.ConfigurationSection;
 import org.jetbrains.annotations.NotNull;
@@ -31,30 +33,29 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
         getLogger().info("Option useModelEngine=" + getConfig().getBoolean("useModelEngine", false));
 
         if (getServer().getPluginManager().isPluginEnabled("ModelEngine")) {
-            // Renommé pour correspondre au nouveau dossier
-            checkModelEngineModels(); 
+            checkModelEngineBlueprints();
         }
 
         getLogger().info("Le plugin de danse est prêt !");
+        getServer().getPluginManager().registerEvents(new PlayerListener(danceManager), this);
 
-        getCommand("danse").setExecutor(this);
-        getCommand("danse").setTabCompleter(new TabCompleter() {
-            @Override
-            public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
+        if (getCommand("danse") != null) {
+            getCommand("danse").setExecutor(this);
+            // Tab completion: suggest styles + control words
+            getCommand("danse").setTabCompleter((sender, command, alias, args) -> {
                 if (args.length == 1) {
-                    List<String> list = danceManager.getStyleNames();
-                    list.add("stop");
-                    list.add("list");
-                    list.add("debug");
-                    return list.stream().filter(s -> s.startsWith(args[0].toLowerCase())).collect(Collectors.toList());
-                } else if (args.length == 2 && !args[0].equalsIgnoreCase("stop") && !args[0].equalsIgnoreCase("list") && !args[0].equalsIgnoreCase("debug")) {
-                    return List.of("visible", "off", "false").stream().filter(s -> s.startsWith(args[1].toLowerCase())).collect(Collectors.toList());
+                    String partial = args[0].toLowerCase();
+                    List<String> base = danceManager.getStyleNames();
+                    base.add("list");
+                    base.add("stop");
+                        base.add("debug");
+                    return base.stream()
+                            .filter(s -> s.toLowerCase().startsWith(partial))
+                            .collect(Collectors.toList());
                 }
                 return List.of();
-            }
-        });
-
-        getServer().getPluginManager().registerEvents(new PlayerListener(danceManager), this);
+            });
+        }
     }
 
     @Override
@@ -62,116 +63,128 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
         if (danceManager != null) {
             danceManager.stopAll();
         }
-        getLogger().info("Le plugin de danse a ete desactive.");
+        getLogger().info("Arrêt du plugin de danse.");
     }
 
-    // --- MISE À JOUR : On pointe vers 'models' et non 'blueprints' ---
-    private void checkModelEngineModels() {
-        boolean useModelEngine = getConfig().getBoolean("useModelEngine", false);
-        if (!useModelEngine) return;
-
+    private void checkModelEngineBlueprints() {
         File modelEngineFolder = new File(getDataFolder().getParentFile(), "ModelEngine");
-        if (!modelEngineFolder.exists()) return;
+        File blueprintsFolder = new File(modelEngineFolder, "blueprints");
 
-        // Le changement critique est ici : on cherche dans "models"
-        File modelsFolder = new File(modelEngineFolder, "models");
-
-        Set<String> configuredModelIds = resolveConfiguredModelIds();
-
-        for (String modelId : configuredModelIds) {
-            File modelFile = new File(modelsFolder, modelId + ".bbmodel");
+        Set<String> modelIds = resolveConfiguredModelIds();
+        for (String modelId : modelIds) {
+            File modelFile = new File(blueprintsFolder, modelId + ".bbmodel");
             if (!modelFile.exists()) {
                 getLogger().severe("========================================");
                 getLogger().severe("[DanseAvecLaStare] ATTENTION: Le fichier de modèle '" + modelId + ".bbmodel' est introuvable !");
-                getLogger().severe("[DanseAvecLaStare] Veuillez le placer dans le dossier : plugins/ModelEngine/models");
+                getLogger().severe("[DanseAvecLaStare] Veuillez le placer dans le dossier : " + blueprintsFolder.getPath());
                 getLogger().severe("[DanseAvecLaStare] Sans ce fichier, la danse liée à ce modèle ne fonctionnera pas.");
                 getLogger().severe("========================================");
+            } else {
+                getLogger().info("[DanseAvecLaStare] Modèle '" + modelId + ".bbmodel' trouvé avec succès dans ModelEngine.");
             }
         }
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
-        if (!(sender instanceof Player)) {
-            sender.sendMessage("Seul un joueur peut danser.");
-            return true;
-        }
-
-        Player player = (Player) sender;
-
-        if (args.length == 0) {
-            if (danceManager.isDancing(player.getUniqueId())) {
-                danceManager.stopDance(player.getUniqueId());
-                player.sendMessage("§aVous avez arrêté de danser.");
-            } else {
-                danceManager.startDance(player, danceManager.parseStyle("twist"));
+        if (command.getName().equalsIgnoreCase("danse")) {
+            try {
+            if (args.length > 0 && args[0].equalsIgnoreCase("debug")) {
+                sendDebugStatus(sender);
+                return true;
             }
-            return true;
-        }
 
-        String sub = args[0].toLowerCase();
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Seul un joueur peut utiliser cette commande.");
+                return true;
+            }
 
-        if (sub.equals("stop")) {
-            danceManager.stopDance(player.getUniqueId());
-            player.sendMessage("§aVous avez arrêté de danser.");
-            return true;
-        }
+            if (args.length == 0) {
+                if (danceManager.isDancing(player.getUniqueId())) {
+                    danceManager.stopDance(player.getUniqueId());
+                } else {
+                    danceManager.startDance(player, danceManager.parseStyle("twist"));
+                    player.sendMessage("§aTu commences à danser: §ftwist");
+                }
+                return true;
+            }
 
-        if (sub.equals("list")) {
-            player.sendMessage("§aStyles de danse disponibles : §f" + danceManager.getStylesLabel());
-            return true;
-        }
+            if (args[0].equalsIgnoreCase("stop")) {
+                danceManager.stopDance(player.getUniqueId());
+                return true;
+            }
 
-        if (sub.equals("debug")) {
-            runDebugCommand(sender);
-            return true;
-        }
+            if (args[0].equalsIgnoreCase("list")) {
+                player.sendMessage("§eStyles disponibles: §f" + danceManager.getStylesLabel());
+                return true;
+            }
 
-        me.utruna.danse.managers.DanceStyle style = danceManager.parseStyle(sub);
-        if (style != null) {
+            me.utruna.danse.managers.DanceStyle style = danceManager.parseStyle(args[0]);
+            if (style == null) {
+                player.sendMessage("§cStyle inconnu. Utilise §f/danse list§c.");
+                return true;
+            }
+            String targetName = null;
             boolean hide = true;
+
             if (args.length > 1) {
-                String a2 = args[1].toLowerCase();
-                if (a2.equals("visible") || a2.equals("off") || a2.equals("false")) {
+                String a1 = args[1];
+                String f = a1.toLowerCase();
+                if (f.equals("off") || f.equals("false") || f.equals("no") || f.equals("0") || f.equals("visible")) {
                     hide = false;
+                } else {
+                    targetName = a1;
+                    if (args.length > 2) {
+                        String f2 = args[2].toLowerCase();
+                        if (f2.equals("off") || f2.equals("false") || f2.equals("no") || f2.equals("0") || f2.equals("visible")) {
+                            hide = false;
+                        }
+                    }
                 }
             }
-            danceManager.startDance(player, style, hide);
-        } else {
-            player.sendMessage("§cStyle inconnu. Faites /danse list.");
+
+            danceManager.startDance(player, style, hide, targetName);
+            player.sendMessage("§aTu commences à danser: §f" + style.getName());
+            return true;
+            } catch (Exception ex) {
+                getLogger().severe("Erreur lors de l'exécution de la commande /danse:");
+                java.io.StringWriter sw = new java.io.StringWriter();
+                ex.printStackTrace(new java.io.PrintWriter(sw));
+                getLogger().severe(sw.toString());
+                if (sender instanceof Player) {
+                    sender.sendMessage("§cUne erreur est survenue. Voir les logs du serveur.");
+                }
+                return true;
+            }
         }
 
-        return true;
+        return false;
     }
 
-    private void runDebugCommand(CommandSender sender) {
-        sender.sendMessage("§8=== §dDanseAvecLaStare Debug §8===");
-        boolean useModelEngine = getConfig().getBoolean("useModelEngine", false);
-        sender.sendMessage("§7useModelEngine (Config): §f" + useModelEngine);
-
-        boolean citizensEnabled = getServer().getPluginManager().isPluginEnabled("Citizens");
+    private void sendDebugStatus(CommandSender sender) {
         boolean modelEngineEnabled = getServer().getPluginManager().isPluginEnabled("ModelEngine");
+        boolean citizensEnabled = getServer().getPluginManager().isPluginEnabled("Citizens");
+        boolean useModelEngine = getConfig().getBoolean("useModelEngine", false);
 
-        sender.sendMessage("§7Citizens plugin: §f" + citizensEnabled);
-        sender.sendMessage("§7ModelEngine plugin: §f" + modelEngineEnabled);
+        File configFile = new File(getDataFolder(), "config.yml");
+        File modelEngineFolder = new File(getDataFolder().getParentFile(), "ModelEngine");
+        File blueprintsFolder = new File(modelEngineFolder, "blueprints");
+        String defaultModelId = getConfig().getString("modelEngine.defaultModelId",
+            getConfig().getString("modelEngine.modelId", "danseur"));
+        File modelFile = new File(blueprintsFolder, defaultModelId + ".bbmodel");
+        ConfigurationSection styleModels = getConfig().getConfigurationSection("modelEngine.styleModels");
 
-        String defaultModelId = getConfig().getString("modelEngine.defaultModelId", "danseur");
-        sender.sendMessage("§7defaultModelId: §f" + defaultModelId);
-
-        File meFolder = new File(getDataFolder().getParentFile(), "ModelEngine");
-        // MISE À JOUR pour le debug : on vérifie le dossier models
-        File modelsFolder = new File(meFolder, "models"); 
-        File modelFile = new File(modelsFolder, defaultModelId + ".bbmodel");
-
-        if (modelEngineEnabled) {
-            sender.sendMessage("§eDossier ME: §f" + meFolder.exists() + " (" + meFolder.getAbsolutePath() + ")");
-            // Affichage mis à jour pour le joueur
-            sender.sendMessage("§eDossier Models: §f" + modelsFolder.exists()); 
+        sender.sendMessage("§6[Danse Debug]§r");
+        sender.sendMessage("§eConfig chargee: §f" + configFile.getAbsolutePath());
+        sender.sendMessage("§euseModelEngine: §f" + useModelEngine);
+        sender.sendMessage("§ePlugin ModelEngine actif: §f" + modelEngineEnabled);
+        sender.sendMessage("§ePlugin Citizens actif: §f" + citizensEnabled);
+        sender.sendMessage("§emodelEngine.defaultModelId: §f" + defaultModelId);
+        if (styleModels != null && !styleModels.getKeys(false).isEmpty()) {
+            sender.sendMessage("§emodelEngine.styleModels: §f" + styleModels.getValues(false));
         }
-        
-        // Affichage mis à jour pour le joueur
-        sender.sendMessage("§eModèle attendu: §f" + modelFile.getAbsolutePath());
-        sender.sendMessage("§eModèle présent: §f" + modelFile.exists());
+        sender.sendMessage("§eBlueprint attendu: §f" + modelFile.getAbsolutePath());
+        sender.sendMessage("§eBlueprint present: §f" + modelFile.exists());
 
         if (modelEngineEnabled && useModelEngine && modelFile.exists()) {
             sender.sendMessage("§aMode actif attendu: ModelEngine");

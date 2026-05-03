@@ -10,8 +10,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.profile.PlayerProfile;
 
 public class ModelEngineDancer implements Dancer {
+    private final DanseAvecLaStare plugin;
+    private final String modelId;
     private final PlayerProfile skinProfile;
     private Dummy<PlayerProfile> dummy; // API officielle
+    private ModeledEntity modeledEntity;
+    private ActiveModel activeModel;
 
     public ModelEngineDancer(DanseAvecLaStare plugin, String modelId, PlayerProfile skinProfile) {
         this.plugin = plugin;

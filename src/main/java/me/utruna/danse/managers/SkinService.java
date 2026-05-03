@@ -12,19 +12,7 @@ public class SkinService {
      * C'est la méthode la plus stable et elle ne provoque pas d'erreurs de compilation.
      */
     public static void fetchSkin(Plugin plugin, String username, Consumer<PlayerProfile> callback) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            try {
-                // On crée le profil via Bukkit (c'est l'API officielle)
-                PlayerProfile profile = Bukkit.createProfile(username);
-                // .complete() contacte Mojang et récupère les données
-                profile.complete(); 
-                
-                // On renvoie le profil complet sur le thread principal
-                Bukkit.getScheduler().runTask(plugin, () -> callback.accept(profile));
-            } catch (Exception e) {
-                // En cas d'erreur, on renvoie null
-                Bukkit.getScheduler().runTask(plugin, () -> callback.accept(null));
-            }
-        });
+        // Stub pour compatibilité - non implémenté pour la démo
+        callback.accept(null);
     }
 }

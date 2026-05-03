@@ -133,7 +133,7 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
                 }
             }
 
-            danceManager.startDance(player, style, hide);
+            danceManager.startDance(player, style, hide, null);
             player.sendMessage("§aTu commences à danser: §f" + style.getName());
             return true;
             } catch (Exception ex) {

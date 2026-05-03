@@ -124,26 +124,16 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
                 player.sendMessage("§cStyle inconnu. Utilise §f/danse list§c.");
                 return true;
             }
-            String targetName = null;
             boolean hide = true;
 
             if (args.length > 1) {
-                String a1 = args[1];
-                String f = a1.toLowerCase();
+                String f = args[1].toLowerCase();
                 if (f.equals("off") || f.equals("false") || f.equals("no") || f.equals("0") || f.equals("visible")) {
                     hide = false;
-                } else {
-                    targetName = a1;
-                    if (args.length > 2) {
-                        String f2 = args[2].toLowerCase();
-                        if (f2.equals("off") || f2.equals("false") || f2.equals("no") || f2.equals("0") || f2.equals("visible")) {
-                            hide = false;
-                        }
-                    }
                 }
             }
 
-            danceManager.startDance(player, style, hide, targetName);
+            danceManager.startDance(player, style, hide);
             player.sendMessage("§aTu commences à danser: §f" + style.getName());
             return true;
             } catch (Exception ex) {

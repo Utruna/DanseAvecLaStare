@@ -14,46 +14,34 @@ dances:
     displayName: "Twist"
     modelId: danseur
     animationName: dance
-    movementType: WAVE          # STATIC, SPIN, ORBIT, WAVE, MOONWALK
-    rotationSpeed: 0.0          # En degrés par tick (pour SPIN/ORBIT)
-    radius: 0.0                 # En blocs (pour ORBIT)
+    movementType: dynamic        # static ou dynamic
 
   spin:
     displayName: "Spin"
     modelId: danseur
     animationName: dance
-    movementType: SPIN
-    rotationSpeed: 5.0
-    radius: 0.0
+    movementType: dynamic
 
   disco:
     displayName: "Disco"
     modelId: danseur
     animationName: dance
-    movementType: STATIC
-    rotationSpeed: 0.0
-    radius: 0.0
+    movementType: static
 
   moonwalk:
     displayName: "Moonwalk"
     modelId: danseur
     animationName: dance
-    movementType: MOONWALK
-    rotationSpeed: 0.0
-    radius: 0.0
+    movementType: dynamic
 
   wave:
     displayName: "Wave"
     modelId: danseur
     animationName: dance
-    movementType: WAVE
-    rotationSpeed: 0.0
-    radius: 0.0
+    movementType: dynamic
 
   dj:
     displayName: "DJ"
     modelId: dj_animation1
     animationName: dance
-    movementType: SPIN
-    rotationSpeed: 5.0
-    radius: 0.0
+    movementType: dynamic

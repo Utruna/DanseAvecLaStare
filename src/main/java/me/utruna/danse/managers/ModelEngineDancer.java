@@ -21,13 +21,6 @@ public class ModelEngineDancer implements Dancer {
     private ModeledEntity modeledEntity;
     private ActiveModel activeModel;
 
-    /**
-     * Constructeur pour ModelEngine.
-     * @param plugin Instance du plugin.
-     * @param modelId ID du blueprint (ex: "danseur").
-     * @param animationName Nom de l'animation à jouer (ex: "dance").
-     * @param skinProfile Le profil du skin à appliquer (peut être null).
-     */
     public ModelEngineDancer(DanseAvecLaStare plugin, String modelId, String animationName, PlayerProfile skinProfile) {
         this.plugin = plugin;
         this.modelId = (modelId == null || modelId.isBlank()) ? "danseur" : modelId.trim();
@@ -39,10 +32,9 @@ public class ModelEngineDancer implements Dancer {
     public void spawn(Location location, Player player) {
         this.owner = player;
 
-        // 1) Création du Dummy avec le skinProfile
+        // 1) Création du Dummy avec le profil (contient la texture du joueur)
         this.dummy = new Dummy<>(skinProfile);
         this.dummy.setLocation(location);
-        this.dummy.setVisible(true);
         this.dummy.setRenderRadius(64);
 
         // 2) Création de l'entité modelée
@@ -58,7 +50,8 @@ public class ModelEngineDancer implements Dancer {
             throw new IllegalStateException("Blueprint introuvable dans ModelEngine : " + modelId);
         }
 
-        // 4) Attachement du modèle
+        plugin.getLogger().info("[DEBUG] Skin appliqué via Dummy: " + (skinProfile != null ? skinProfile.getName() : "null"));
+
         this.modeledEntity.addModel(activeModel, true);
     }
 
@@ -68,12 +61,10 @@ public class ModelEngineDancer implements Dancer {
             Location playerLoc = owner.getLocation().clone();
             Location danceLocation = style.computeLocation(playerLoc, tick);
             
-            // Mise à jour de la position et de la rotation
             dummy.setLocation(danceLocation);
             dummy.setYBodyRot(danceLocation.getYaw());
             dummy.setYHeadRot(danceLocation.getYaw());
 
-            // Lancement de l'animation dynamique si elle n'est pas déjà en cours
             if (!activeModel.getAnimationHandler().isPlayingAnimation(animationName)) {
                 activeModel.getAnimationHandler().playAnimation(animationName, 0.1d, 0.1d, 1.0d, true);
             }

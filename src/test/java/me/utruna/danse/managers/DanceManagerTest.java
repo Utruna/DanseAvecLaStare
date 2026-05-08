@@ -23,7 +23,8 @@ class DanceManagerTest {
 
     @Test
     void getStylesLabelShouldContainAllStylesSorted() {
-        assertEquals("disco, moonwalk, spin, twist, wave", danceManager.getStylesLabel());
+        String label = String.join(", ", danceManager.getStyleNames());
+        assertEquals("disco, dj, moonwalk, spin, twist, wave", label);
     }
 
     @Test

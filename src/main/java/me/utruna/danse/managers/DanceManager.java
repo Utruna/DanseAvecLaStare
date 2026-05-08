@@ -14,15 +14,29 @@ public class DanceManager {
 
     private final DanseAvecLaStare plugin;
     private final Map<UUID, RunningDance> runningDances = new ConcurrentHashMap<>();
-    private static final Map<String, DanceStyle> STYLES = new HashMap<>();
+    private final Map<String, DanceStyle> STYLES = new HashMap<>();
+    private final Map<String, DanceConfig> danceConfigs = new HashMap<>();  // Cache des configs
 
-    static {
-        STYLES.put("twist", new TwistStyle());
-        STYLES.put("spin", new SpinStyle());
-        STYLES.put("disco", new DiscoStyle());
-        STYLES.put("moonwalk", new MoonwalkStyle());
-        STYLES.put("wave", new WaveStyle());
-        STYLES.put("dj", new DjStyle());
+    /**
+     * Configuration d'une danse, lue depuis config.yml
+     */
+    private static class DanceConfig {
+        String displayName;
+        String modelId;
+        String animationName;
+        GenericDanceStyle.MovementType movementType;
+        double rotationSpeed;
+        double radius;
+
+        DanceConfig(String displayName, String modelId, String animationName, 
+                   GenericDanceStyle.MovementType movementType, double rotationSpeed, double radius) {
+            this.displayName = displayName;
+            this.modelId = modelId;
+            this.animationName = animationName;
+            this.movementType = movementType;
+            this.rotationSpeed = rotationSpeed;
+            this.radius = radius;
+        }
     }
 
     private static class RunningDance {
@@ -30,15 +44,128 @@ public class DanceManager {
         Dancer dancer;
         boolean previousInvisible;
     }
+
     public boolean isDancing(UUID uuid) {
         return runningDances.containsKey(uuid);
     }
+
     public DanceManager(DanseAvecLaStare plugin) {
         this.plugin = plugin;
+        loadDancesFromConfig();
+        // Fallback : si aucun style n'a été chargé (plugin null ou pas de config), utiliser les styles par défaut
+        if (STYLES.isEmpty()) {
+            initializeDefaultStyles();
+        }
+    }
+
+    /**
+     * Initialise les styles par défaut (fallback pour tests ou pas de config.yml)
+     */
+    private void initializeDefaultStyles() {
+        // Ces styles correspondent à l'ancienne architecture statique
+        STYLES.put("twist", new GenericDanceStyle("twist", GenericDanceStyle.MovementType.WAVE, 0.0, 0.0));
+        danceConfigs.put("twist", new DanceConfig("Twist", "danseur", "dance", GenericDanceStyle.MovementType.WAVE, 0.0, 0.0));
+
+        STYLES.put("spin", new GenericDanceStyle("spin", GenericDanceStyle.MovementType.SPIN, 5.0, 0.0));
+        danceConfigs.put("spin", new DanceConfig("Spin", "danseur", "dance", GenericDanceStyle.MovementType.SPIN, 5.0, 0.0));
+
+        STYLES.put("disco", new GenericDanceStyle("disco", GenericDanceStyle.MovementType.STATIC, 0.0, 0.0));
+        danceConfigs.put("disco", new DanceConfig("Disco", "danseur", "dance", GenericDanceStyle.MovementType.STATIC, 0.0, 0.0));
+
+        STYLES.put("moonwalk", new GenericDanceStyle("moonwalk", GenericDanceStyle.MovementType.MOONWALK, 0.0, 0.0));
+        danceConfigs.put("moonwalk", new DanceConfig("Moonwalk", "danseur", "dance", GenericDanceStyle.MovementType.MOONWALK, 0.0, 0.0));
+
+        STYLES.put("wave", new GenericDanceStyle("wave", GenericDanceStyle.MovementType.WAVE, 0.0, 0.0));
+        danceConfigs.put("wave", new DanceConfig("Wave", "danseur", "dance", GenericDanceStyle.MovementType.WAVE, 0.0, 0.0));
+
+        STYLES.put("dj", new GenericDanceStyle("dj", GenericDanceStyle.MovementType.STATIC, 0.0, 0.0));
+        danceConfigs.put("dj", new DanceConfig("DJ", "dj_animation1", "dj_dance", GenericDanceStyle.MovementType.STATIC, 0.0, 0.0));
+    }
+
+    /**
+     * Charge toutes les dances depuis la section 'dances' de config.yml
+     * Les styles sont créés dynamiquement via GenericDanceStyle
+     */
+    private void loadDancesFromConfig() {
+        STYLES.clear();
+        danceConfigs.clear();
+
+        // En cas de plugin null (tests), ignorer le chargement
+        if (plugin == null) {
+            return;
+        }
+
+        org.bukkit.configuration.ConfigurationSection dancesSection = 
+            plugin.getConfig().getConfigurationSection("dances");
+
+        if (dancesSection == null) {
+            plugin.getLogger().warning("Section 'dances' non trouvée dans config.yml");
+            return;
+        }
+
+        for (String key : dancesSection.getKeys(false)) {
+            org.bukkit.configuration.ConfigurationSection danceSection = 
+                dancesSection.getConfigurationSection(key);
+
+            if (danceSection == null) continue;
+
+            try {
+                String displayName = danceSection.getString("displayName", key);
+                String modelId = danceSection.getString("modelId", "danseur");
+                String animationName = danceSection.getString("animationName", "dance");
+                String movementTypeStr = danceSection.getString("movementType", "STATIC");
+                double rotationSpeed = danceSection.getDouble("rotationSpeed", 0.0);
+                double radius = danceSection.getDouble("radius", 0.0);
+
+                GenericDanceStyle.MovementType movementType;
+                try {
+                    movementType = GenericDanceStyle.MovementType.valueOf(movementTypeStr);
+                } catch (IllegalArgumentException e) {
+                    plugin.getLogger().warning("Type de mouvement invalide pour '" + key + "': " + movementTypeStr);
+                    movementType = GenericDanceStyle.MovementType.STATIC;
+                }
+
+                // Convertir en isStatic et pattern
+                boolean isStatic = movementType == GenericDanceStyle.MovementType.STATIC;
+                String pattern = convertMovementTypeToPattern(movementType);
+
+                // Créer le style dynamiquement
+                GenericDanceStyle style = new GenericDanceStyle(
+                    displayName,
+                    isStatic,
+                    pattern,
+                    rotationSpeed,
+                    radius
+                );
+
+                // Enregistrer le style et sa configuration
+                STYLES.put(key.toLowerCase(), style);
+                danceConfigs.put(key.toLowerCase(), new DanceConfig(
+                    displayName,
+                    modelId,
+                    animationName,
+                    movementType,
+                    rotationSpeed,
+                    radius
+                ));
+            } catch (Exception ex) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING, 
+                    "Erreur en chargeant la danse '" + key + "'", ex);
+            }
+        }
     }
 
     public void startDance(Player player, DanceStyle style, boolean hideFromOwner, String targetName) {
         stopDance(player.getUniqueId());
+
+        // Récupérer la config du style
+        String styleName = style.getName().toLowerCase();
+        DanceConfig config = danceConfigs.get(styleName);
+        
+        if (config == null) {
+            player.sendMessage("§cErreur: Configuration manquante pour le style '" + style.getName() + "'");
+            return;
+        }
 
         // Cas 1 : On veut le skin d'un autre joueur (Asynchrone)
         if (targetName != null && !targetName.isBlank()) {
@@ -47,7 +174,7 @@ public class DanceManager {
                     player.sendMessage("§cJoueur introuvable ou erreur Mojang.");
                     return;
                 }
-                Dancer dancer = new ModelEngineDancer(plugin, resolveModelIdForStyle(style), profile);
+                Dancer dancer = new ModelEngineDancer(plugin, config.modelId, config.animationName, profile);
                 finishDanceSetup(player, dancer, style, hideFromOwner);
             });
             return;
@@ -60,9 +187,8 @@ public class DanceManager {
         Dancer dancer;
         if (useModelEngine) {
             // On passe null pour utiliser le skin par défaut/du joueur dans le Dummy
-            dancer = new ModelEngineDancer(plugin, resolveModelIdForStyle(style), null);
+            dancer = new ModelEngineDancer(plugin, config.modelId, config.animationName, null);
         } else {
-            // Fallback Citizens (à implémenter si besoin)
             player.sendMessage("§cModelEngine n'est pas activé.");
             return;
         }
@@ -76,6 +202,7 @@ public class DanceManager {
 
         try {
             dancer.spawn(origin, player);
+            player.sendMessage("§aDanse démarrée!");
 
             RunningDance running = new RunningDance();
             running.dancer = dancer;
@@ -93,7 +220,8 @@ public class DanceManager {
 
             runningDances.put(uuid, running);
         } catch (Exception ex) {
-            plugin.getLogger().log(Level.SEVERE, "Erreur lors du lancement de la danse", ex);
+            player.sendMessage("§cErreur lors du lancement: " + ex.getMessage());
+            plugin.getLogger().log(java.util.logging.Level.SEVERE, "Erreur dance", ex);
             player.setInvisible(false);
         }
     }
@@ -108,13 +236,6 @@ public class DanceManager {
         }
     }
 
-    private String resolveModelIdForStyle(DanceStyle style) {
-        String styleName = style.getName().toLowerCase(Locale.ROOT);
-        String byStyle = plugin.getConfig().getString("modelEngine.styleModels." + styleName);
-        if (byStyle != null && !byStyle.isBlank()) return byStyle.trim();
-        return plugin.getConfig().getString("modelEngine.defaultModelId", "danseur");
-    }
-
     public void stopAll() {
         runningDances.keySet().forEach(this::stopDance);
     }
@@ -126,5 +247,25 @@ public class DanceManager {
     public DanceStyle parseStyle(String value) {
         return value == null ? null : STYLES.get(value.toLowerCase(Locale.ROOT));
     }
-    
+
+    /**
+     * Convertit un ancien MovementType en pattern pour GenericDanceStyle.
+     */
+    private String convertMovementTypeToPattern(GenericDanceStyle.MovementType movementType) {
+        switch (movementType) {
+            case STATIC:
+            case DYNAMIC:
+                return "wave";  // pattern par défaut
+            case SPIN:
+                return "spin";
+            case ORBIT:
+                return "orbit";
+            case WAVE:
+                return "wave";
+            case MOONWALK:
+                return "moonwalk";
+            default:
+                return "wave";
+        }
+    }
 }

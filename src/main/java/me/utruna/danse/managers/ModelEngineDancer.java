@@ -13,6 +13,7 @@ public class ModelEngineDancer implements Dancer {
 
     private final DanseAvecLaStare plugin;
     private final String modelId;
+    private final String animationName;
     private final PlayerProfile skinProfile;
     
     private Player owner;
@@ -21,14 +22,16 @@ public class ModelEngineDancer implements Dancer {
     private ActiveModel activeModel;
 
     /**
-     * Constructeur propre pour ModelEngine 4.
+     * Constructeur pour ModelEngine.
      * @param plugin Instance du plugin.
      * @param modelId ID du blueprint (ex: "danseur").
+     * @param animationName Nom de l'animation à jouer (ex: "dance").
      * @param skinProfile Le profil du skin à appliquer (peut être null).
      */
-    public ModelEngineDancer(DanseAvecLaStare plugin, String modelId, PlayerProfile skinProfile) {
+    public ModelEngineDancer(DanseAvecLaStare plugin, String modelId, String animationName, PlayerProfile skinProfile) {
         this.plugin = plugin;
         this.modelId = (modelId == null || modelId.isBlank()) ? "danseur" : modelId.trim();
+        this.animationName = (animationName == null || animationName.isBlank()) ? "dance" : animationName.trim();
         this.skinProfile = skinProfile;
     }
 
@@ -36,8 +39,7 @@ public class ModelEngineDancer implements Dancer {
     public void spawn(Location location, Player player) {
         this.owner = player;
 
-        // 1) Création du Dummy avec le skinProfile (API officielle Paper/ME)
-        // Si skinProfile est null, le Dummy utilisera le skin par défaut du serveur
+        // 1) Création du Dummy avec le skinProfile
         this.dummy = new Dummy<>(skinProfile);
         this.dummy.setLocation(location);
         this.dummy.setVisible(true);
@@ -71,9 +73,9 @@ public class ModelEngineDancer implements Dancer {
             dummy.setYBodyRot(danceLocation.getYaw());
             dummy.setYHeadRot(danceLocation.getYaw());
 
-            // Lancement de l'animation si elle n'est pas déjà en cours
-            if (!activeModel.getAnimationHandler().isPlayingAnimation("dance")) {
-                activeModel.getAnimationHandler().playAnimation("dance", 0.1d, 0.1d, 1.0d, true);
+            // Lancement de l'animation dynamique si elle n'est pas déjà en cours
+            if (!activeModel.getAnimationHandler().isPlayingAnimation(animationName)) {
+                activeModel.getAnimationHandler().playAnimation(animationName, 0.1d, 0.1d, 1.0d, true);
             }
         }
     }

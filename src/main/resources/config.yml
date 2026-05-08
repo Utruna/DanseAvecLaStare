@@ -5,7 +5,55 @@ useModelEngine: true
 
 modelEngine:
   defaultModelId: danseur
-  styleModels:
-    twist: danseur
-    spin: danseur
-    dj: dj_animation1
+  defaultAnimationName: dance
+
+# Configuration des dances - Chaque style de danse est défini ici
+# Ajoute une nouvelle danse sans modifier le code Java, juste la config !
+dances:
+  twist:
+    displayName: "Twist"
+    modelId: danseur
+    animationName: dance
+    movementType: WAVE          # STATIC, SPIN, ORBIT, WAVE, MOONWALK
+    rotationSpeed: 0.0          # En degrés par tick (pour SPIN/ORBIT)
+    radius: 0.0                 # En blocs (pour ORBIT)
+
+  spin:
+    displayName: "Spin"
+    modelId: danseur
+    animationName: dance
+    movementType: SPIN
+    rotationSpeed: 5.0
+    radius: 0.0
+
+  disco:
+    displayName: "Disco"
+    modelId: danseur
+    animationName: dance
+    movementType: STATIC
+    rotationSpeed: 0.0
+    radius: 0.0
+
+  moonwalk:
+    displayName: "Moonwalk"
+    modelId: danseur
+    animationName: dance
+    movementType: MOONWALK
+    rotationSpeed: 0.0
+    radius: 0.0
+
+  wave:
+    displayName: "Wave"
+    modelId: danseur
+    animationName: dance
+    movementType: WAVE
+    rotationSpeed: 0.0
+    radius: 0.0
+
+  dj:
+    displayName: "DJ"
+    modelId: dj_animation1
+    animationName: dance
+    movementType: SPIN
+    rotationSpeed: 5.0
+    radius: 0.0

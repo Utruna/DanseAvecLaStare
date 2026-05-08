@@ -149,7 +149,11 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
     }
 
     private void sendDebugStatus(CommandSender sender) {
-        // ... (Ton code debug actuel est correct, garde-le tel quel)
+        sender.sendMessage("§e=== DEBUG STATUS ===");
+        sender.sendMessage("§fModelEngine enabled: §7" + getServer().getPluginManager().isPluginEnabled("ModelEngine"));
+        sender.sendMessage("§fConfig useModelEngine: §7" + getConfig().getBoolean("useModelEngine", false));
+        sender.sendMessage("§fAvailable dances: §7" + danceManager.getStyleNames());
+        sender.sendMessage("§e===================");
     }
 
     private Set<String> resolveConfiguredModelIds() {

@@ -19,21 +19,14 @@ public class DanceManager {
     private final Map<String, DanceConfig> danceConfigs = new HashMap<>();
 
     private static class DanceConfig {
-        String displayName;
-        String modelId;
-        String animationName;
-        GenericDanceStyle.MovementType movementType;
-        double rotationSpeed;
-        double radius;
+        public final String modelId;
+        public final String animationName;
 
-        DanceConfig(String displayName, String modelId, String animationName, 
-                   GenericDanceStyle.MovementType movementType, double rotationSpeed, double radius) {
-            this.displayName = displayName;
+        public DanceConfig(String displayName, String modelId, String animationName,
+                           GenericDanceStyle.MovementType movementType, double rotationSpeed, double radius) {
+            // Les autres paramètres sont stockés mais non utilisés pour le moment
             this.modelId = modelId;
             this.animationName = animationName;
-            this.movementType = movementType;
-            this.rotationSpeed = rotationSpeed;
-            this.radius = radius;
         }
     }
 
@@ -167,6 +160,7 @@ public class DanceManager {
         }
 
         // Cas 2 : Skin du joueur actuel → utiliser directement son profil
+        @SuppressWarnings("deprecation")
         PlayerProfile currentProfile = player.getPlayerProfile();
         plugin.getLogger().info("[DEBUG] Profil du joueur actuel: " + player.getName());
         Dancer dancer = new ModelEngineDancer(plugin, config.modelId, config.animationName, currentProfile);

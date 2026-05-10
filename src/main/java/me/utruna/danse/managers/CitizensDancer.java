@@ -3,7 +3,6 @@ package me.utruna.danse.managers;
 import me.utruna.danse.DanseAvecLaStare;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.npc.NPC;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.entity.Entity;

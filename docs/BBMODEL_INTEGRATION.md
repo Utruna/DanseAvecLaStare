@@ -23,22 +23,49 @@ Flux d'exécution pour appliquer un skin sur un modèle animé :
 
 **Nommage des bones (obligatoire)**
 
-Utiliser les préfixes ModelEngine pour les player limbs :
+Les bones de premier niveau doivent avoir exactement ces noms pour que ModelEngine détecte les `PlayerLimb` :
 
-| Bone      | Membre         |
-|-----------|----------------|
-| `phead_`  | Tête           |
-| `pbody_`  | Torse          |
-| `prarm_`  | Bras droit     |
-| `plarm_`  | Bras gauche    |
-| `prleg_`  | Jambe droite   |
-| `plleg_`  | Jambe gauche   |
+| Bone exact        | Membre         |
+|-------------------|----------------|
+| `phead_head`      | Tête           |
+| `pbody_body`      | Torse          |
+| `prarm_right_arm` | Bras droit     |
+| `plarm_left_arm`  | Bras gauche    |
+| `prleg_right_leg` | Jambe droite   |
+| `plleg_left_leg`  | Jambe gauche   |
+
+La hiérarchie attendue dans Blockbench est la suivante (seul le premier niveau compte pour la détection) :
+
+```
+waist
+├── phead_head
+│   ├── Head
+│   └── Hat Layer
+├── pbody_body
+│   ├── Body
+│   └── Body Layer
+├── prarm_right_arm
+│   ├── Right_arm
+│   └── Right Arm Layer
+├── plarm_left_arm
+│   ├── Left_arm
+│   └── Left Arm Layer
+├── prleg_right_leg
+│   ├── Right_leg
+│   └── Right Leg Layer
+└── plleg_left_leg
+    ├── Left_leg
+    └── Left Leg Layer
+```
+
+**Nom de l'animation (obligatoire)**
+
+L'animation doit s'appeler exactement **`dance`** dans Blockbench. La config `animationName: dance` dans `config.yml` doit correspondre à ce nom.
 
 **Règles de géométrie**
 
 - Chaque limb doit avoir des cubes visibles et ne doit pas être placé dans un groupe masqué.
 - Chaque limb doit être indépendant (pas parenté à la tête ou à un autre limb).
-- Donner un nom d'animation explicite et stable dans Blockbench. Ce nom doit être copié dans `config.yml` sous `animationName`.
 
 ---
 
@@ -48,6 +75,7 @@ Utiliser les préfixes ModelEngine pour les player limbs :
 2. Copier le fichier dans `plugins/ModelEngine/blueprints/`.
 3. Vérifier côté serveur : `createActiveModel(modelId)` retourne un `ActiveModel` non nul.
 4. Lancer `/danse debug` et vérifier que les bones `PlayerLimb` sont détectés (`Bones found: N`) et que `✓ Skin applied` apparaît pour chaque limb attendu.
+5. Vérifier que l'animation `dance` est bien présente dans le blueprint (visible dans les logs debug si le nom ne correspond pas).
 
 ---
 
@@ -59,7 +87,7 @@ Utiliser les préfixes ModelEngine pour les player limbs :
 - `activeModel != null`
 
 **Côté modèle / client**
-- `animationName` correspond au nom exact dans le `.bbmodel`
+- L'animation dans Blockbench s'appelle bien `dance` (et `animationName: dance` dans `config.yml`)
 - Les cubes des limbs sont présents et visibles dans Blockbench
 - Le resource pack ModelEngine est correctement chargé par le client
 

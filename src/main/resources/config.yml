@@ -7,9 +7,6 @@ configVersion: "1.1"
 # false = fallback to Citizens implementation
 useModelEngine: true
 
-modelEngine:
-  defaultModelId: danseur
-  defaultAnimationName: dance
 
 # Configuration des dances - Chaque style de danse est défini ici
 # Ajoute une nouvelle danse sans modifier le code Java, juste la config !

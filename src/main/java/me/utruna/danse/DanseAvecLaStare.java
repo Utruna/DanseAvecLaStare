@@ -15,10 +15,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.logging.Level;
+import java.util.UUID;
 
 public class DanseAvecLaStare extends JavaPlugin {
 
     private DanceManager danceManager;
+    private final Set<UUID> debugPlayers = new HashSet<>();
 
     @Override
     public void onEnable() {
@@ -61,13 +63,11 @@ public class DanseAvecLaStare extends JavaPlugin {
      */
     private void updateConfigIfNeeded() {
         try {
-            // Charger le config par défaut depuis la ressource JAR
             File configFile = new File(getDataFolder(), "config.yml");
             if (!configFile.exists()) {
                 return; // saveDefaultConfig() va s'en charger
             }
 
-            // Charger le default config depuis le JAR
             java.io.InputStream defaultInput = getResource("config.yml");
             if (defaultInput == null) {
                 getLogger().warning("Impossible de charger le config.yml par défaut depuis le JAR");
@@ -81,22 +81,20 @@ public class DanseAvecLaStare extends JavaPlugin {
             org.bukkit.configuration.file.YamlConfiguration currentConfig = 
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
 
-            boolean needsSave = false;
+            String beforeUpdate = currentConfig.saveToString();
 
-            // Fusionner récursivement les clés manquantes
-            if (!mergeConfigSections(defaultConfig, currentConfig, "")) {
-                needsSave = true;
-            }
+            currentConfig.setDefaults(defaultConfig);
+            currentConfig.options().copyDefaults(true);
 
-            // Vérifier si la version de config a changé (optionnel mais utile)
             String configVersion = currentConfig.getString("configVersion", "1.0");
             String defaultVersion = defaultConfig.getString("configVersion", "1.0");
             
             if (!configVersion.equals(defaultVersion)) {
                 currentConfig.set("configVersion", defaultVersion);
-                needsSave = true;
                 getLogger().info("Config mis à jour de version " + configVersion + " à " + defaultVersion);
             }
+
+            boolean needsSave = !beforeUpdate.equals(currentConfig.saveToString());
 
             if (needsSave) {
                 currentConfig.save(configFile);
@@ -106,36 +104,6 @@ public class DanseAvecLaStare extends JavaPlugin {
         } catch (Exception ex) {
             getLogger().log(Level.WARNING, "Erreur lors de la mise à jour du config.yml", ex);
         }
-    }
-
-    /**
-     * Fusionne récursivement les sections du config par défaut dans le config courant.
-     * Retourne true si aucune fusion n'a été nécessaire, false sinon.
-     */
-    private boolean mergeConfigSections(ConfigurationSection source, ConfigurationSection target, String path) {
-        boolean allPresent = true;
-        
-        for (String key : source.getKeys(false)) {
-            String fullPath = path.isEmpty() ? key : path + "." + key;
-            
-            if (!target.contains(key)) {
-                // La clé manque : l'ajouter depuis la source
-                target.set(fullPath, source.get(key));
-                allPresent = false;
-                getLogger().fine("Clé ajoutée: " + fullPath);
-            } else if (source.isConfigurationSection(key) && target.isConfigurationSection(key)) {
-                // C'est une sous-section : fusionner récursivement
-                ConfigurationSection sourceSection = source.getConfigurationSection(key);
-                ConfigurationSection targetSection = target.getConfigurationSection(key);
-                if (sourceSection != null && targetSection != null) {
-                    if (!mergeConfigSections(sourceSection, targetSection, fullPath)) {
-                        allPresent = false;
-                    }
-                }
-            }
-        }
-        
-        return allPresent;
     }
 
     @Override
@@ -164,8 +132,12 @@ public class DanseAvecLaStare extends JavaPlugin {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (!command.getName().equalsIgnoreCase("danse")) return false;
-
         if (args.length > 0 && args[0].equalsIgnoreCase("debug")) {
+            if (sender instanceof Player p) {
+                UUID id = p.getUniqueId();
+                boolean now = togglePlayerDebug(id);
+                p.sendMessage("§eMode debug " + (now ? "activé" : "désactivé") + " pour vous.");
+            }
             sendDebugStatus(sender);
             return true;
         }
@@ -236,7 +208,24 @@ public class DanseAvecLaStare extends JavaPlugin {
         sender.sendMessage("§fModelEngine enabled: §7" + getServer().getPluginManager().isPluginEnabled("ModelEngine"));
         sender.sendMessage("§fConfig useModelEngine: §7" + getConfig().getBoolean("useModelEngine", false));
         sender.sendMessage("§fAvailable dances: §7" + danceManager.getStyleNames());
+        if (sender instanceof Player p) {
+            sender.sendMessage("§fDebug mode for you: §7" + (isPlayerDebug(p.getUniqueId()) ? "ON" : "OFF"));
+        }
         sender.sendMessage("§e===================");
+    }
+
+    public boolean isPlayerDebug(UUID id) {
+        return debugPlayers.contains(id);
+    }
+
+    public boolean togglePlayerDebug(UUID id) {
+        if (debugPlayers.contains(id)) {
+            debugPlayers.remove(id);
+            return false;
+        } else {
+            debugPlayers.add(id);
+            return true;
+        }
     }
 
     private Set<String> resolveConfiguredModelIds() {

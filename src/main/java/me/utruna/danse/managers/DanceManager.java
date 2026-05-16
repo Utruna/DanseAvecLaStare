@@ -34,6 +34,7 @@ public class DanceManager {
         BukkitTask task;
         Dancer dancer;
         boolean previousInvisible;
+        int tickCounter = 0;  // Compteur pour tracker les ticks
     }
 
     public boolean isDancing(UUID uuid) {
@@ -186,7 +187,8 @@ public class DanceManager {
                     stopDance(uuid);
                     return;
                 }
-                dancer.tick(0, style);
+                running.tickCounter++;
+                dancer.tick(running.tickCounter, style);
             }, 0L, 1L);
 
             runningDances.put(uuid, running);

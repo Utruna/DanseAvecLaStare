@@ -1,3 +1,7 @@
+# Configuration du plugin DanseAvecLaStare
+# Cette version sera mise à jour automatiquement lors du déploiement de nouvelles versions
+configVersion: "1.1"
+
 # Strategy switch
 # true = use ModelEngine when plugin is present
 # false = fallback to Citizens implementation
@@ -14,7 +18,7 @@ dances:
     displayName: "Twist"
     modelId: danseur
     animationName: dance
-    movementType: dynamic        # static ou dynamic
+    movementType: dynamic
 
   spin:
     displayName: "Spin"

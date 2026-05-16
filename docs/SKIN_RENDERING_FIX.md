@@ -6,26 +6,24 @@ Implémenter le rendu des skins de joueurs sur les modèles ModelEngine 4.0.9 lo
 ## 📋 Problème Découvert
 Le blueprint `danseur.bbmodel` **n'a pas de PlayerLimb behaviors configurés** sur les bones. Sans ces behaviors, les skins ne peuvent pas être appliqués visuellement.
 
-### ⚠️ IMPORTANT - Convention de Nommage des Bones
-Les bones doivent utiliser une **convention de nommage spécifique** pour que ModelEngine reconnaisse les PlayerLimb behaviors :
+### Evidence
+Logs du serveur montrant l'état actuel :
+```
+Bones found: 7
+=== BONE METHODS ===
+  getImmutableBoneBehaviors() -> Map
+  addBoneBehavior(BoneBehavior) -> void
+  hasBoneBehavior(BoneBehaviorType) -> boolean
+  getBoneBehavior(BoneBehaviorType) -> Optional
+  removeBoneBehavior(BoneBehaviorType) -> Optional
+  forBehaviors(Consumer) -> void
 
-| Partie du Corps | Nom du Bone dans Blockbench |
-|---|---|
-| Tête | `phead_head` |
-| Corps | `pbody_body` |
-| Bras Droit | `prarm_right_arm` |
-| Bras Gauche | `plarm_left_arm` |
-| Jambe Droite | `prleg_right_leg` |
-| Jambe Gauche | `plleg_left_leg` |
+Processing bone: head
+  Behaviors on head: 1
+  Behavior type: HeadForcedImpl          ← ⚠️ Pas de PlayerLimb!
+```
 
-**⚠️ Les noms précédents (head, body, left_arm, etc.) ne fonctionnent PAS avec les PlayerLimb behaviors!**
-
-### 🔧 État Actuel du Rendu
-- ✅ **Tête** : Le skin s'affiche correctement
-- ⏳ **Corps** : En cours de débogage (ne s'affiche pas encore)
-- ⏳ **Bras/Jambes** : En cours de débogage (ne s'affichent pas encore)
-
-Il est probable que les noms des bones doivent être corrigés dans le blueprint.
+Tous les bones (head, body, left_arm, right_arm, left_leg, right_leg, waist) ont uniquement `HeadForcedImpl` comme behavior.
 
 ---
 
@@ -56,86 +54,50 @@ Il est probable que les noms des bones doivent être corrigés dans le blueprint
 - ✅ Identification précise du problème: absence de PlayerLimb behaviors
 - ✅ Code prêt pour fonctionner une fois le blueprint configuré
 
-### 6. API Resolution - setTexture()
-- ✅ Exploration des signatures de méthodes sur PlayerLimbImpl via getDeclaredMethods()
-- ✅ Première approche: `setTexture(PlayerProfile)` - échoue (incompatibilité package)
-- ✅ Deuxième approche: `setTexture(String, String)` - méthode n'existe pas
-- ✅ Solution trouvée: `setTexture(Player)` - **FONCTIONNE!**
-- ✅ Code modifier pour utiliser l'objet `owner` (Player)
-
-### 7. Tests en Jeu
-- ✅ Blueprint modifié avec PlayerLimb behaviors
-- ✅ Tête affiche le skin correctement
-- ⏳ **Corps/Bras/Jambes**: Ne s'affichent pas encore
-- ⏳ **Suspicion**: Problème de nommage des bones ou de configuration ModelEngine
-
 ---
 
 ## 🔧 Modifications Requises - BLUEPRINT
 
-### ⚠️ AVANT TOUT: Renommer les Bones
-
-**Les bones doivent être renommés avec la convention ModelEngine:**
-
-| Ancien Nom | Nouveau Nom |
-|---|---|
-| `head` | `phead_head` |
-| `body` | `pbody_body` |
-| `left_arm` | `plarm_left_arm` |
-| `right_arm` | `prarm_right_arm` |
-| `left_leg` | `plleg_left_leg` |
-| `right_leg` | `prleg_right_leg` |
-
-**Procédure:**
-1. Ouvre `danseur.bbmodel` dans Blockbench
-2. Pour chaque bone à renommer:
-   - Clique droit sur le bone
-   - **Edit Name** (ou double-clic)
-   - Remplace le nom selon le tableau ci-dessus
-3. **File → Save**
-
 ### Étapes à Faire dans Blockbench
 
-#### Après le renommage, ajouter les PlayerLimb behaviors
-
-**Prérequis**
+#### Prérequis
 - Blockbench installé
-- Fichier `danseur.bbmodel` ouvert et bones renommés
+- Fichier `danseur.bbmodel` ouvert
 
 #### Pour CHAQUE bone de joueur (6 bones):
 
 **1. Head (tête)**
-- Double-clic sur le bone `phead_head`
+- Double-clic sur le bone `head`
 - Clic droit → **Add Behavior** → **PlayerLimb**
 - Sélectionner le type: **HEAD**
 - ✅ Sauvegarder
 
 **2. Body (corps)**
-- Double-clic sur le bone `pbody_body`
+- Double-clic sur le bone `body`
 - Clic droit → **Add Behavior** → **PlayerLimb**
 - Sélectionner le type: **BODY**
 - ✅ Sauvegarder
 
 **3. Left Arm (bras gauche)**
-- Double-clic sur le bone `plarm_left_arm`
+- Double-clic sur le bone `left_arm`
 - Clic droit → **Add Behavior** → **PlayerLimb**
 - Sélectionner le type: **LEFT_ARM**
 - ✅ Sauvegarder
 
 **4. Right Arm (bras droit)**
-- Double-clic sur le bone `prarm_right_arm`
+- Double-clic sur le bone `right_arm`
 - Clic droit → **Add Behavior** → **PlayerLimb**
 - Sélectionner le type: **RIGHT_ARM**
 - ✅ Sauvegarder
 
 **5. Left Leg (jambe gauche)**
-- Double-clic sur le bone `plleg_left_leg`
+- Double-clic sur le bone `left_leg`
 - Clic droit → **Add Behavior** → **PlayerLimb**
 - Sélectionner le type: **LEFT_LEG**
 - ✅ Sauvegarder
 
 **6. Right Leg (jambe droite)**
-- Double-clic sur le bone `prleg_right_leg`
+- Double-clic sur le bone `right_leg`
 - Clic droit → **Add Behavior** → **PlayerLimb**
 - Sélectionner le type: **RIGHT_LEG**
 - ✅ Sauvegarder
@@ -182,33 +144,14 @@ Il est probable que les noms des bones doivent être corrigés dans le blueprint
 | Composant | Status | Notes |
 |-----------|--------|-------|
 | SkinService | ✅ Complet | Fetche les profils async |
-| ModelEngineDancer | ✅ Complet | Applique les skins via `setTexture(Player)` |
+| ModelEngineDancer | ✅ Complet | Applique les skins aux PlayerLimb |
 | DanceManager | ✅ Complet | Gère le cycle de vie des dances |
 | Pipeline de Skin | ✅ Complet | Récupération → Application |
-| Blueprint Renommage | ⏳ **À FAIRE** | Renommer les bones (phead_head, pbody_body, etc.) |
-| PlayerLimb Behaviors | ⏳ **À FAIRE** | Ajouter behaviors aux bones renommés |
+| Blueprint | ⏳ **À FAIRE** | Ajouter PlayerLimb behaviors |
 
 ---
 
-## � Débogage En Cours
-
-### État du Rendu (10 Mai 2026 - ~00:35)
-- ✅ **Tête** : Skin affiche correctement
-- ⏳ **Corps** : Skin ne s'affiche pas
-- ⏳ **Bras/Jambes** : Skins ne s'affichent pas
-
-### Hypothèses en Investigation
-1. Les bones du blueprint n'ont pas les noms exacts attendus par ModelEngine
-2. La convention de nommage `phead_head`, `pbody_body`, etc. est requise
-3. Possible que certains PlayerLimb behaviors ne soient pas correctement configurés
-
-### Prochaines Actions
-1. Vérifier les noms exacts des bones dans le blueprint (.bbmodel)
-2. Renommer les bones selon la convention si nécessaire
-3. Réappliquer les PlayerLimb behaviors sur les bones renommés
-4. Tester `/danse twist` après renommage
-
----
+## 🚀 Prochaines Étapes
 
 1. ✅ **Immédiat**: Modifier le blueprint dans Blockbench (see above)
 2. ✅ **Après**: Redémarrer le serveur
@@ -238,22 +181,11 @@ Il est probable que les noms des bones doivent être corrigés dans le blueprint
 bone.getImmutableBoneBehaviors()  // Map<BoneBehaviorType, BoneBehavior>
 bone.addBoneBehavior(behavior)     // void
 bone.getBoneBehavior(type)         // Optional<BoneBehavior>
-behavior.setTexture(player)        // void - SOLUTION FINALE!
+behavior.setTexture(profile)       // void - si c'est PlayerLimb
 ```
 
-### Approches Testées pour setTexture()
-1. ❌ `setTexture(PlayerProfile)` - Incompatibilité de package (Bukkit vs Paper)
-2. ❌ `setTexture(String, String)` - Méthode n'existe pas
-3. ✅ `setTexture(Player)` - **FONCTIONNE!** Passe l'objet Player directement
-
 ### Limitation Actuelle
-Les noms des bones doivent suivre une convention spécifique pour être reconnus par ModelEngine:
-- `phead_head` pour la tête
-- `pbody_body` pour le corps
-- `plarm_left_arm` / `prarm_right_arm` pour les bras
-- `plleg_left_leg` / `prleg_right_leg` pour les jambes
-
-Les anciens noms (`head`, `body`, etc.) ne fonctionnent que partiellement.
+Le code ne peut pas créer automatiquement les PlayerLimb behaviors car ils doivent être configurés dans le blueprint Blockbench. C'est une limitation de design de ModelEngine.
 
 ---
 

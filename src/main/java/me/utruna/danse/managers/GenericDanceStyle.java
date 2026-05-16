@@ -41,7 +41,7 @@ public class GenericDanceStyle implements DanceStyle {
             return loc;
         }
 
-        // DYNAMIC : Ondulation sinusoïdale simple
+        // DYNAMIC : rotation simple; les mouvements visuels sont gérés par le BBMODEL
         double phase = tick * 0.15;
         loc.setYaw(normalizeYaw(origin.getYaw() + (float) (Math.sin(phase) * 40.0)));
         return loc;

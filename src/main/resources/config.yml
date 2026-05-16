@@ -20,30 +20,6 @@ dances:
     animationName: dance
     movementType: dynamic
 
-  spin:
-    displayName: "Spin"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic
-
-  disco:
-    displayName: "Disco"
-    modelId: danseur
-    animationName: dance
-    movementType: static
-
-  moonwalk:
-    displayName: "Moonwalk"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic
-
-  wave:
-    displayName: "Wave"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic
-
   dj:
     displayName: "DJ"
     modelId: dj_animation1

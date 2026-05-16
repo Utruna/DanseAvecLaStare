@@ -57,7 +57,7 @@ public class ModelEngineDancer implements Dancer {
 
         this.modeledEntity.addModel(activeModel, true);
 
-        // Appliquer le skin aux bones du modèle
+        // Appliquer la texture aux player limbs.
         if (skinProfile != null) {
             applySkinToModel();
         }
@@ -99,75 +99,78 @@ public class ModelEngineDancer implements Dancer {
                 }
             }
 
-            // Récupérer tous les comportements de chaque bone
-            String[] playerBones = {"head", "body", "left_arm", "right_arm", "left_leg", "right_leg"};
+            String[] playerBones = {
+                "head", "phead_head", "phead",
+                "body", "pbody_body", "pbody",
+                "left_arm", "plarm_left_arm", "plarm",
+                "right_arm", "prarm_right_arm", "prarm",
+                "left_leg", "plleg_left_leg", "plleg",
+                "right_leg", "prleg_right_leg", "prleg"
+            };
 
-            // Itérer sur les entries (clé = boneName, valeur = bone object)
             for (java.util.Map.Entry<?, ?> entry : bonesMap.entrySet()) {
-                String boneName = (String) entry.getKey();  // La clé est le nom du bone
+                String boneName = (String) entry.getKey();
                 Object bone = entry.getValue();
-                
-                // Vérifier si c'est un bone de joueur
+
+                boolean isPlayerBone = false;
                 for (String playerBone : playerBones) {
                     if (boneName != null && boneName.equalsIgnoreCase(playerBone)) {
+                        isPlayerBone = true;
+                        break;
+                    }
+                }
+                if (!isPlayerBone) {
+                    continue;
+                }
+
+                try {
+                    plugin.getLogger().info("Processing bone: " + boneName);
+
+                    Object boneBehaviorsObj = invokeMethodWithException(bone, "getImmutableBoneBehaviors");
+                    if (!(boneBehaviorsObj instanceof java.util.Map)) {
+                        plugin.getLogger().info("  getImmutableBoneBehaviors() returned: " + (boneBehaviorsObj == null ? "null" : boneBehaviorsObj.getClass().getSimpleName()));
+                        continue;
+                    }
+
+                    java.util.Map<?, ?> boneBehaviors = (java.util.Map<?, ?>) boneBehaviorsObj;
+                    plugin.getLogger().info("  Behaviors on " + boneName + ": " + boneBehaviors.size());
+
+                    boolean hasPlayerLimb = false;
+                    for (java.util.Map.Entry<?, ?> behaviorEntry : boneBehaviors.entrySet()) {
+                        Object behaviorValue = behaviorEntry.getValue();
+                        if (behaviorValue == null) {
+                            continue;
+                        }
+
+                        String behaviorName = behaviorValue.getClass().getSimpleName();
+                        plugin.getLogger().info("    Behavior type: " + behaviorName);
+
+                        if (!behaviorName.contains("PlayerLimb")) {
+                            continue;
+                        }
+
+                        hasPlayerLimb = true;
+                        Object limbType = invokeMethod(behaviorValue, "getLimbType");
+                        plugin.getLogger().info("    Limb type: " + String.valueOf(limbType));
+
                         try {
-                            plugin.getLogger().info("Processing bone: " + boneName);
-                            
-                            // Récupérer les comportements du bone
-                            Object boneBehaviorsObj = invokeMethodWithException(bone, "getImmutableBoneBehaviors");
-                            if (boneBehaviorsObj instanceof java.util.Map) {
-                                java.util.Map<?, ?> boneBehaviors = (java.util.Map<?, ?>) boneBehaviorsObj;
-                                plugin.getLogger().info("  Behaviors on " + boneName + ": " + boneBehaviors.size());
-                                
-                                // Chercher PlayerLimb dans les comportements
-                                boolean hasPlayerLimb = false;
-                                for (java.util.Map.Entry<?, ?> behaviorEntry : boneBehaviors.entrySet()) {
-                                    Object behaviorValue = behaviorEntry.getValue();
-                                    plugin.getLogger().info("    Behavior type: " + behaviorValue.getClass().getSimpleName());
-                                    
-                                    // Vérifier si c'est un PlayerLimb
-                                    if (behaviorValue.getClass().getSimpleName().contains("PlayerLimb")) {
-                                        hasPlayerLimb = true;
-                                        
-                                        // Afficher les méthodes disponibles
-                                        java.lang.reflect.Method[] playerLimbMethods = behaviorValue.getClass().getDeclaredMethods();
-                                        plugin.getLogger().info("=== PlayerLimb Methods ===");
-                                        for (java.lang.reflect.Method m : playerLimbMethods) {
-                                            if (!m.getName().startsWith("lambda")) {
-                                                StringBuilder sig = new StringBuilder(m.getName() + "(");
-                                                java.lang.Class<?>[] params = m.getParameterTypes();
-                                                for (int i = 0; i < params.length; i++) {
-                                                    sig.append(params[i].getSimpleName());
-                                                    if (i < params.length - 1) sig.append(", ");
-                                                }
-                                                sig.append(") -> ").append(m.getReturnType().getSimpleName());
-                                                plugin.getLogger().info("  " + sig);
-                                            }
-                                        }
-                                        
-                                        // Essayer différentes approches
-                                        try {
-                                            // Approche: setTexture(Player)
-                                            invokeMethodWithException(behaviorValue, "setTexture", 
-                                                new Class<?>[]{org.bukkit.entity.Player.class}, owner);
-                                            plugin.getLogger().info("✓ Skin applied to bone: " + boneName + " (via Player)");
-                                        } catch (Exception e1) {
-                                            plugin.getLogger().warning("Error applying skin to " + boneName + ": " + e1.getClass().getSimpleName() + " - " + e1.getMessage());
-                                        }
-                                    }
-                                }
-                                
-                                // Si pas de PlayerLimb, essayer d'en ajouter un
-                                if (!hasPlayerLimb) {
-                                    plugin.getLogger().info("  No PlayerLimb on " + boneName + " - skipping for now");
-                                }
-                            } else {
-                                plugin.getLogger().info("  getImmutableBoneBehaviors() returned: " + (boneBehaviorsObj == null ? "null" : boneBehaviorsObj.getClass().getSimpleName()));
+                            invokeMethodWithException(behaviorValue, "setTexture", new Class<?>[]{org.bukkit.profile.PlayerProfile.class}, owner.getPlayerProfile());
+                            plugin.getLogger().info("    ✓ Skin applied via PlayerProfile");
+                        } catch (Exception e1) {
+                            try {
+                                invokeMethodWithException(behaviorValue, "setTexture", new Class<?>[]{org.bukkit.entity.Player.class}, owner);
+                                plugin.getLogger().info("    ✓ Skin applied via Player");
+                            } catch (Exception e2) {
+                                plugin.getLogger().warning("    ✗ setTexture failed on " + boneName + ": " + e2.getClass().getSimpleName() + " - " + e2.getMessage());
                             }
-                        } catch (Exception e) {
-                            plugin.getLogger().warning("Error on bone " + boneName + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
                         }
                     }
+
+                    if (!hasPlayerLimb) {
+                        plugin.getLogger().warning("  No PlayerLimb behavior found on " + boneName);
+                    }
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Error on bone " + boneName + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
                 }
             }
             plugin.getLogger().info("=== SKIN APPLICATION COMPLETE ===");

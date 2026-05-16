@@ -1,11 +1,17 @@
 # Configuration du plugin DanseAvecLaStare
 # Cette version sera mise à jour automatiquement lors du déploiement de nouvelles versions
-configVersion: "1.1"
+configVersion: "1.2"
 
 # Strategy switch
 # true = use ModelEngine when plugin is present
 # false = fallback to Citizens implementation
 useModelEngine: true
+
+# Mode de secours pour les clients avec shaders / packs fragiles.
+# true = charge un blueprint alternatif plus simple et applique les textures de façon dynamique.
+modelEngine:
+  useFallbackMode: false
+  fallbackModelId: joueur_fallback
 
 
 # Configuration des dances - Chaque style de danse est défini ici

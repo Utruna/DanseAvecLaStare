@@ -6,6 +6,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+/**
+ * Écoute les événements joueurs pour stopper automatiquement la danse à la déconnexion.
+ */
 public class PlayerListener implements Listener {
 
     private final DanceManager danceManager;

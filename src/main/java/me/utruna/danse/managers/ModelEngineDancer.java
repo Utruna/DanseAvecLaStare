@@ -10,8 +10,15 @@ import org.bukkit.entity.Player;
 import org.bukkit.profile.PlayerProfile;
 
 import java.util.ArrayList;
+import java.lang.reflect.Method;
 import java.util.List;
 
+/**
+ * Implémentation {@link Dancer} basée sur ModelEngine 4.0.9.
+ * Crée un {@code Dummy<PlayerProfile>} comme support du skin, charge et attache un {@code ActiveModel},
+ * puis applique la texture sur les bones {@code PlayerLimb} via réflexion pour rester compatible
+ * avec plusieurs builds de ModelEngine sans recompilation.
+ */
 public class ModelEngineDancer implements Dancer {
 
     private final DanseAvecLaStare plugin;
@@ -19,6 +26,8 @@ public class ModelEngineDancer implements Dancer {
     private final String animationName;
     @SuppressWarnings("deprecation")
     private final PlayerProfile skinProfile;
+    private final boolean useFallbackMode;
+    private final String fallbackModelId;
 
     private Player owner;
     @SuppressWarnings("deprecation")
@@ -33,6 +42,11 @@ public class ModelEngineDancer implements Dancer {
         this.modelId = modelId == null ? null : modelId.trim();
         this.animationName = animationName == null ? null : animationName.trim();
         this.skinProfile = skinProfile;
+        this.useFallbackMode = plugin.getConfig().getBoolean("modelEngine.useFallbackMode", false);
+        String configuredFallbackModelId = plugin.getConfig().getString("modelEngine.fallbackModelId", "joueur_fallback");
+        this.fallbackModelId = configuredFallbackModelId == null || configuredFallbackModelId.isBlank()
+            ? "joueur_fallback"
+            : configuredFallbackModelId.trim();
     }
 
     private boolean isDebugEnabled() {
@@ -55,6 +69,11 @@ public class ModelEngineDancer implements Dancer {
     public void spawn(Location location, Player player) {
         this.owner = player;
 
+        String blueprintId = getEffectiveModelId();
+        if (blueprintId == null || blueprintId.isBlank()) {
+            throw new IllegalStateException("Aucun blueprint ModelEngine valide n'est disponible.");
+        }
+
         this.dummy = new Dummy<>(skinProfile);
         this.dummy.setLocation(location);
         this.dummy.setRenderRadius(64);
@@ -65,14 +84,15 @@ public class ModelEngineDancer implements Dancer {
         }
         this.modeledEntity.registerSelf();
 
-        this.activeModel = ModelEngineAPI.createActiveModel(modelId);
+        this.activeModel = ModelEngineAPI.createActiveModel(blueprintId);
         if (this.activeModel == null) {
-            throw new IllegalStateException("Blueprint introuvable dans ModelEngine : " + modelId);
+            throw new IllegalStateException("Blueprint introuvable dans ModelEngine : " + blueprintId);
         }
 
         loadAvailableAnimations();
         this.resolvedAnimationName = resolveAnimationName();
 
+        debugInfo("[DEBUG] Mode de rendu=" + (useFallbackMode ? "fallback" : "standard") + ", blueprint=" + blueprintId);
         debugInfo("[DEBUG] Skin appliqué via Dummy: " + (skinProfile != null ? skinProfile.getName() : "null"));
 
         this.modeledEntity.addModel(activeModel, true);
@@ -85,7 +105,7 @@ public class ModelEngineDancer implements Dancer {
     @SuppressWarnings("deprecation")
     private void applySkinToModel() {
         try {
-            debugInfo("=== APPLYING SKIN ===");
+            debugInfo("=== APPLYING SKIN (" + (useFallbackMode ? "FALLBACK" : "STANDARD") + ") ===");
 
             Object bonesObj = invokeMethod(activeModel, "getBones");
             if (bonesObj == null) {
@@ -96,50 +116,9 @@ public class ModelEngineDancer implements Dancer {
             java.util.Map<?, ?> bonesMap = (java.util.Map<?, ?>) bonesObj;
             debugInfo("Bones found: " + bonesMap.size());
 
-            if (!bonesMap.isEmpty()) {
-                Object firstBone = bonesMap.values().iterator().next();
-                debugInfo("=== BONE METHODS ===");
-                java.lang.reflect.Method[] boneMethods = firstBone.getClass().getMethods();
-                for (java.lang.reflect.Method method : boneMethods) {
-                    String methodName = method.getName();
-                    if (methodName.contains("Behavior") || methodName.contains("behavior")) {
-                        StringBuilder signature = new StringBuilder(methodName + "(");
-                        Class<?>[] params = method.getParameterTypes();
-                        for (int i = 0; i < params.length; i++) {
-                            signature.append(params[i].getSimpleName());
-                            if (i < params.length - 1) {
-                                signature.append(", ");
-                            }
-                        }
-                        signature.append(") -> ").append(method.getReturnType().getSimpleName());
-                        debugInfo("  " + signature);
-                    }
-                }
-            }
-
-            String[] playerBones = {
-                "head", "phead_head", "phead",
-                "body", "pbody_body", "pbody",
-                "left_arm", "plarm_left_arm", "plarm",
-                "right_arm", "prarm_right_arm", "prarm",
-                "left_leg", "plleg_left_leg", "plleg",
-                "right_leg", "prleg_right_leg", "prleg"
-            };
-
             for (java.util.Map.Entry<?, ?> entry : bonesMap.entrySet()) {
                 String boneName = String.valueOf(entry.getKey());
                 Object bone = entry.getValue();
-
-                boolean isPlayerBone = false;
-                for (String playerBone : playerBones) {
-                    if (boneName.equalsIgnoreCase(playerBone)) {
-                        isPlayerBone = true;
-                        break;
-                    }
-                }
-                if (!isPlayerBone) {
-                    continue;
-                }
 
                 try {
                     debugInfo("Processing bone: " + boneName);
@@ -153,7 +132,7 @@ public class ModelEngineDancer implements Dancer {
                     java.util.Map<?, ?> boneBehaviors = (java.util.Map<?, ?>) boneBehaviorsObj;
                     debugInfo("  Behaviors on " + boneName + ": " + boneBehaviors.size());
 
-                    boolean hasPlayerLimb = false;
+                    boolean hasTextureCapableBehavior = false;
                     for (java.util.Map.Entry<?, ?> behaviorEntry : boneBehaviors.entrySet()) {
                         Object behaviorValue = behaviorEntry.getValue();
                         if (behaviorValue == null) {
@@ -163,29 +142,16 @@ public class ModelEngineDancer implements Dancer {
                         String behaviorName = behaviorValue.getClass().getSimpleName();
                         debugInfo("    Behavior type: " + behaviorName);
 
-                        if (!behaviorName.contains("PlayerLimb")) {
-                            continue;
-                        }
-
-                        hasPlayerLimb = true;
-                        Object limbType = invokeMethod(behaviorValue, "getLimbType");
-                        debugInfo("    Limb type: " + String.valueOf(limbType));
-
-                        try {
-                            invokeMethodWithException(behaviorValue, "setTexture", new Class<?>[]{PlayerProfile.class}, owner.getPlayerProfile());
-                            debugInfo("    ✓ Skin applied via PlayerProfile");
-                        } catch (Exception e1) {
-                            try {
-                                invokeMethodWithException(behaviorValue, "setTexture", new Class<?>[]{Player.class}, owner);
-                                debugInfo("    ✓ Skin applied via Player");
-                            } catch (Exception e2) {
-                                debugWarn("    ✗ setTexture failed on " + boneName + ": " + e2.getClass().getSimpleName() + " - " + e2.getMessage());
-                            }
+                        if (applyTextureToBehavior(behaviorValue)) {
+                            hasTextureCapableBehavior = true;
+                            debugInfo("    ✓ Skin appliqué sur " + boneName + " via " + behaviorName);
+                        } else {
+                            debugInfo("    - Aucun setTexture compatible sur " + behaviorName);
                         }
                     }
 
-                    if (!hasPlayerLimb) {
-                        debugWarn("  No PlayerLimb behavior found on " + boneName);
+                    if (!hasTextureCapableBehavior) {
+                        debugWarn("  No texture-capable behavior found on " + boneName);
                     }
                 } catch (Exception e) {
                     debugWarn("Error on bone " + boneName + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
@@ -196,6 +162,45 @@ public class ModelEngineDancer implements Dancer {
         } catch (Exception e) {
             debugWarn("Error in applySkinToModel: " + e.getMessage());
         }
+    }
+
+    private boolean applyTextureToBehavior(Object behavior) {
+        if (behavior == null) {
+            return false;
+        }
+
+        Method[] methods = behavior.getClass().getMethods();
+        for (Method method : methods) {
+            if (!method.getName().equals("setTexture") || method.getParameterCount() != 1) {
+                continue;
+            }
+
+            Class<?> parameterType = method.getParameterTypes()[0];
+            try {
+                // Priorité au skinProfile fourni (profil du joueur ciblé, pas forcément owner)
+                if (skinProfile != null && parameterType.isInstance(skinProfile)) {
+                    method.invoke(behavior, skinProfile);
+                    return true;
+                }
+
+                // Fallback : passer le joueur directement si le behavior l'accepte
+                if (owner != null && Player.class.isAssignableFrom(parameterType)) {
+                    method.invoke(behavior, owner);
+                    return true;
+                }
+            } catch (Exception ex) {
+                debugWarn("    ✗ setTexture failed on " + behavior.getClass().getSimpleName() + " : " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
+            }
+        }
+
+        return false;
+    }
+
+    private String getEffectiveModelId() {
+        if (useFallbackMode) {
+            return fallbackModelId != null && !fallbackModelId.isBlank() ? fallbackModelId : modelId;
+        }
+        return modelId;
     }
 
     private Object invokeMethod(Object obj, String methodName, Class<?>[] paramTypes, Object... args) {

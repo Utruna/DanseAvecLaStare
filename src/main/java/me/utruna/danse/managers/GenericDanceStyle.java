@@ -4,8 +4,9 @@ import org.bukkit.Location;
 import org.bukkit.entity.ArmorStand;
 
 /**
- * Classe de style de danse générique et configurable.
- * Deux modes : STATIC (joueur immobile) ou DYNAMIC (joueur se déplace).
+ * Style de danse configurable chargé depuis {@code config.yml}.
+ * Mode {@code STATIC} : le modèle reste à la position du joueur.
+ * Mode {@code DYNAMIC} : le yaw oscille sinusoïdalement autour du yaw d'origine.
  */
 public class GenericDanceStyle implements DanceStyle {
 
@@ -18,9 +19,6 @@ public class GenericDanceStyle implements DanceStyle {
         DYNAMIC     // Joueur se déplace
     }
 
-    /**
-     * Constructeur complet avec pattern.
-     */
     public GenericDanceStyle(String name, boolean isStatic, String pattern, double rotationSpeed, double radius) {
         this.name = name;
         this.isStatic = isStatic;

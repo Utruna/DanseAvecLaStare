@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\" -Recurse -Force)",
+      "Bash(Select-Object -Property FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\\\\docs\\\\pipeline_skin.md\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\\\\docs\\\\SKIN_RENDERING_FIX.md\" -Force)",
+      "Bash(Write-Host \"Supprimés.\")",
+      "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/docs/pipeline_skin.md\")",
+      "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/docs/SKIN_RENDERING_FIX.md\")",
+      "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/src/main/java/me/utruna/danse/managers/AbstractDanceStyle.java\")",
+      "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/src/main/java/me/utruna/danse/managers/PluginManager.java\")"
+    ]
+  }
+}

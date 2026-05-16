@@ -1,3 +1,7 @@
+# Configuration du plugin DanseAvecLaStare
+# Cette version sera mise à jour automatiquement lors du déploiement de nouvelles versions
+configVersion: "1.1"
+
 # Strategy switch
 # true = use ModelEngine when plugin is present
 # false = fallback to Citizens implementation
@@ -12,30 +16,6 @@ modelEngine:
 dances:
   twist:
     displayName: "Twist"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic        # static ou dynamic
-
-  spin:
-    displayName: "Spin"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic
-
-  disco:
-    displayName: "Disco"
-    modelId: danseur
-    animationName: dance
-    movementType: static
-
-  moonwalk:
-    displayName: "Moonwalk"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic
-
-  wave:
-    displayName: "Wave"
     modelId: danseur
     animationName: dance
     movementType: dynamic

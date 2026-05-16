@@ -5,7 +5,6 @@ import me.utruna.danse.managers.DanceManager;
 import me.utruna.danse.managers.DanceStyle; // Importation correcte du style
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.configuration.ConfigurationSection;
@@ -17,13 +16,14 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.logging.Level;
 
-public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
+public class DanseAvecLaStare extends JavaPlugin {
 
     private DanceManager danceManager;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        updateConfigIfNeeded();
         reloadConfig();
 
         danceManager = new DanceManager(this);
@@ -53,6 +53,89 @@ public class DanseAvecLaStare extends JavaPlugin implements CommandExecutor {
             });
         }
         getLogger().info("Le plugin de danse est prêt !");
+    }
+
+    /**
+     * Met à jour automatiquement le config.yml avec les nouvelles clés depuis le fichier par défaut.
+     * Les valeurs existantes ne sont pas modifiées, seules les clés manquantes sont ajoutées.
+     */
+    private void updateConfigIfNeeded() {
+        try {
+            // Charger le config par défaut depuis la ressource JAR
+            File configFile = new File(getDataFolder(), "config.yml");
+            if (!configFile.exists()) {
+                return; // saveDefaultConfig() va s'en charger
+            }
+
+            // Charger le default config depuis le JAR
+            java.io.InputStream defaultInput = getResource("config.yml");
+            if (defaultInput == null) {
+                getLogger().warning("Impossible de charger le config.yml par défaut depuis le JAR");
+                return;
+            }
+
+            org.bukkit.configuration.file.YamlConfiguration defaultConfig = 
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(
+                    new java.io.InputStreamReader(defaultInput, java.nio.charset.StandardCharsets.UTF_8));
+            
+            org.bukkit.configuration.file.YamlConfiguration currentConfig = 
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(configFile);
+
+            boolean needsSave = false;
+
+            // Fusionner récursivement les clés manquantes
+            if (!mergeConfigSections(defaultConfig, currentConfig, "")) {
+                needsSave = true;
+            }
+
+            // Vérifier si la version de config a changé (optionnel mais utile)
+            String configVersion = currentConfig.getString("configVersion", "1.0");
+            String defaultVersion = defaultConfig.getString("configVersion", "1.0");
+            
+            if (!configVersion.equals(defaultVersion)) {
+                currentConfig.set("configVersion", defaultVersion);
+                needsSave = true;
+                getLogger().info("Config mis à jour de version " + configVersion + " à " + defaultVersion);
+            }
+
+            if (needsSave) {
+                currentConfig.save(configFile);
+                getLogger().info("✓ Config.yml mis à jour automatiquement (nouvelles clés ajoutées)");
+            }
+
+        } catch (Exception ex) {
+            getLogger().log(Level.WARNING, "Erreur lors de la mise à jour du config.yml", ex);
+        }
+    }
+
+    /**
+     * Fusionne récursivement les sections du config par défaut dans le config courant.
+     * Retourne true si aucune fusion n'a été nécessaire, false sinon.
+     */
+    private boolean mergeConfigSections(ConfigurationSection source, ConfigurationSection target, String path) {
+        boolean allPresent = true;
+        
+        for (String key : source.getKeys(false)) {
+            String fullPath = path.isEmpty() ? key : path + "." + key;
+            
+            if (!target.contains(key)) {
+                // La clé manque : l'ajouter depuis la source
+                target.set(fullPath, source.get(key));
+                allPresent = false;
+                getLogger().fine("Clé ajoutée: " + fullPath);
+            } else if (source.isConfigurationSection(key) && target.isConfigurationSection(key)) {
+                // C'est une sous-section : fusionner récursivement
+                ConfigurationSection sourceSection = source.getConfigurationSection(key);
+                ConfigurationSection targetSection = target.getConfigurationSection(key);
+                if (sourceSection != null && targetSection != null) {
+                    if (!mergeConfigSections(sourceSection, targetSection, fullPath)) {
+                        allPresent = false;
+                    }
+                }
+            }
+        }
+        
+        return allPresent;
     }
 
     @Override

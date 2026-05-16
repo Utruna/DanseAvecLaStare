@@ -44,6 +44,7 @@ class DanceManagerTest {
         assertEquals(origin.getX(), atTick8.getX(), 1.0e-9);
         assertNotEquals(origin.getYaw(), atTick8.getYaw(), 1.0e-6f);
         assertEquals(origin.getY(), atTick8.getY(), 1.0e-9);
+        assertEquals(origin.getZ(), atTick8.getZ(), 1.0e-9);
     }
 
     @Test

@@ -167,13 +167,47 @@ public class DanceManager {
         finishDanceSetup(player, dancer, style, hideFromOwner);
     }
 
+    /**
+     * Identique à {@link #startDance} mais n'envoie pas de message au joueur.
+     * Utilisé par {@link PlaylistManager} pour les transitions automatiques entre pistes.
+     */
+    public void startDanceSilent(Player player, DanceStyle style, boolean hideFromOwner, String targetName) {
+        stopDance(player.getUniqueId());
+
+        String styleName = style.getName().toLowerCase();
+        DanceConfig config = danceConfigs.get(styleName);
+        if (config == null || config.modelId == null || config.modelId.isBlank()) return;
+
+        boolean useModelEngine = Bukkit.getPluginManager().isPluginEnabled("ModelEngine")
+                && plugin.getConfig().getBoolean("useModelEngine", false);
+        if (!useModelEngine) return;
+
+        if (targetName != null && !targetName.isBlank()) {
+            SkinService.fetchSkin(plugin, targetName.trim(), profile -> {
+                if (profile == null) return;
+                Dancer dancer = new ModelEngineDancer(plugin, config.modelId, config.animationName, profile);
+                finishDanceSetup(player, dancer, style, hideFromOwner, true);
+            });
+            return;
+        }
+
+        @SuppressWarnings("deprecation")
+        org.bukkit.profile.PlayerProfile currentProfile = player.getPlayerProfile();
+        Dancer dancer = new ModelEngineDancer(plugin, config.modelId, config.animationName, currentProfile);
+        finishDanceSetup(player, dancer, style, hideFromOwner, true);
+    }
+
     private void finishDanceSetup(Player player, Dancer dancer, DanceStyle style, boolean hideFromOwner) {
+        finishDanceSetup(player, dancer, style, hideFromOwner, false);
+    }
+
+    private void finishDanceSetup(Player player, Dancer dancer, DanceStyle style, boolean hideFromOwner, boolean silent) {
         final UUID uuid = player.getUniqueId();
         final Location origin = player.getLocation().clone();
 
         try {
             dancer.spawn(origin, player);
-            player.sendMessage("§aDanse démarrée!");
+            if (!silent) player.sendMessage("§aDanse démarrée!");
 
             RunningDance running = new RunningDance();
             running.dancer = dancer;
@@ -192,7 +226,7 @@ public class DanceManager {
 
             runningDances.put(uuid, running);
         } catch (Exception ex) {
-            player.sendMessage("§cErreur lors du lancement: " + ex.getMessage());
+            if (!silent) player.sendMessage("§cErreur lors du lancement: " + ex.getMessage());
             plugin.getLogger().log(Level.SEVERE, "Erreur dance", ex);
             player.setInvisible(false);
         }

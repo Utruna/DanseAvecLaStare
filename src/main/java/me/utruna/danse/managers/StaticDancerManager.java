@@ -25,14 +25,24 @@ public class StaticDancerManager {
     private final DanseAvecLaStare plugin;
     private final Map<String, StaticDancerEntry> activeDancers = new ConcurrentHashMap<>();
 
+    // --- Chorégraphie ---
+    // groupId → set ordonné d'IDs de danseurs
+    private final Map<String, Set<String>> choreographyGroups = new LinkedHashMap<>();
+    // groupId → tâche partagée du groupe
+    private final Map<String, BukkitTask> groupTasks = new ConcurrentHashMap<>();
+    // dancerId → groupId (lookup inverse)
+    private final Map<String, String> dancerToGroup = new ConcurrentHashMap<>();
+
     private static class StaticDancerEntry {
         @SuppressWarnings("deprecation")
         Dummy<PlayerProfile> dummy;
         ModeledEntity modeledEntity;
         ActiveModel activeModel;
+        String currentBlueprintId;
+        @SuppressWarnings("deprecation")
+        PlayerProfile skinProfile;
         BukkitTask task;
         String resolvedAnimation;
-        // Champs pour la persistance et le déplacement
         String styleName;
         String skinName;
         Location location;
@@ -43,13 +53,9 @@ public class StaticDancerManager {
     }
 
     // -------------------------------------------------------------------------
-    // API publique
+    // API publique — danseurs statiques
     // -------------------------------------------------------------------------
 
-    /**
-     * Fait apparaître un danseur statique avec le profil de skin du joueur.
-     * skinName est sauvegardé pour restaurer le skin au redémarrage.
-     */
     @SuppressWarnings("deprecation")
     public boolean spawnStaticDancer(String id, Location location, String danceStyleName,
                                      @Nullable PlayerProfile skinProfile, @Nullable String skinName) {
@@ -115,11 +121,18 @@ public class StaticDancerManager {
             entry.dummy = dummy;
             entry.modeledEntity = modeledEntity;
             entry.activeModel = activeModel;
+            entry.currentBlueprintId = blueprintId;
+            entry.skinProfile = effectiveProfile;
             entry.resolvedAnimation = resolvedAnimation;
             entry.styleName = danceStyleName;
             entry.skinName = skinName;
             entry.location = location.clone();
-            entry.task = startAnimationLoop(entry);
+
+            // Si ce danseur appartient déjà à un groupe (chargé depuis choreography.yml),
+            // on ne démarre pas de tâche individuelle — le groupe s'en chargera.
+            if (!dancerToGroup.containsKey(id)) {
+                entry.task = startAnimationLoop(entry);
+            }
 
             activeDancers.put(id, entry);
             saveDancer(id, entry);
@@ -132,12 +145,28 @@ public class StaticDancerManager {
         }
     }
 
-    /**
-     * Supprime un danseur et l'efface du fichier de sauvegarde.
-     */
     public boolean removeStaticDancer(String id) {
         StaticDancerEntry entry = activeDancers.remove(id);
         if (entry == null) return false;
+
+        // Notifier le PlaylistManager avant de détruire
+        if (playlistManager != null) playlistManager.onDancerRemoved(id);
+
+        // Retirer du groupe de chorégraphie si applicable
+        String groupId = dancerToGroup.remove(id);
+        if (groupId != null) {
+            Set<String> groupIds = choreographyGroups.get(groupId);
+            if (groupIds != null) {
+                groupIds.remove(id);
+                if (groupIds.isEmpty()) {
+                    BukkitTask old = groupTasks.remove(groupId);
+                    if (old != null) old.cancel();
+                    choreographyGroups.remove(groupId);
+                    saveChoreography();
+                }
+            }
+        }
+
         try {
             destroyEntry(entry);
         } catch (Exception e) {
@@ -148,9 +177,6 @@ public class StaticDancerManager {
         return true;
     }
 
-    /**
-     * Déplace un danseur existant vers une nouvelle position et met à jour la sauvegarde.
-     */
     public boolean moveStaticDancer(String id, Location newLocation) {
         StaticDancerEntry entry = activeDancers.get(id);
         if (entry == null) return false;
@@ -162,18 +188,18 @@ public class StaticDancerManager {
         return true;
     }
 
-    /**
-     * Renvoie un set immuable de tous les IDs actifs.
-     */
     public Set<String> getDancerIds() {
         return Collections.unmodifiableSet(activeDancers.keySet());
     }
 
-    /**
-     * Nettoyage au onDisable : détruit les entités sans toucher au fichier
-     * pour que les danseurs soient restaurés au prochain démarrage.
-     */
     public void removeAll() {
+        for (BukkitTask task : groupTasks.values()) {
+            if (task != null) task.cancel();
+        }
+        groupTasks.clear();
+        choreographyGroups.clear();
+        dancerToGroup.clear();
+
         for (Map.Entry<String, StaticDancerEntry> e : activeDancers.entrySet()) {
             try {
                 destroyEntry(e.getValue());
@@ -185,13 +211,330 @@ public class StaticDancerManager {
     }
 
     // -------------------------------------------------------------------------
-    // Persistance
+    // API publique — chorégraphie
     // -------------------------------------------------------------------------
 
     /**
-     * Charge et restaure tous les danseurs depuis static_dancers.yml.
-     * Appelé dans onEnable, après que ModelEngine soit prêt.
+     * Crée (ou remplace) un groupe de chorégraphie, annule les tâches individuelles
+     * des danseurs concernés et synchronise leurs animations immédiatement.
+     *
+     * @return false si au moins un ID n'existe pas en tant que danseur statique actif
      */
+    public boolean createChoreography(String groupId, List<String> dancerIds) {
+        for (String id : dancerIds) {
+            if (!activeDancers.containsKey(id)) return false;
+        }
+
+        // Dissoudre l'ancien groupe s'il existait
+        disbandGroupInternal(groupId);
+
+        Set<String> ids = new LinkedHashSet<>(dancerIds);
+        choreographyGroups.put(groupId, ids);
+
+        for (String id : ids) {
+            // Retirer d'un éventuel autre groupe
+            String oldGroup = dancerToGroup.get(id);
+            if (oldGroup != null && !oldGroup.equals(groupId)) {
+                disbandGroupInternal(oldGroup);
+            }
+            // Annuler la tâche individuelle
+            StaticDancerEntry entry = activeDancers.get(id);
+            if (entry != null && entry.task != null) {
+                entry.task.cancel();
+                entry.task = null;
+            }
+            dancerToGroup.put(id, groupId);
+        }
+
+        BukkitTask task = startGroupTask(groupId);
+        groupTasks.put(groupId, task);
+        saveChoreography();
+        return true;
+    }
+
+    /**
+     * Ajoute un danseur à un groupe existant (ou le crée) et re-synchronise.
+     *
+     * @return false si le danseur n'existe pas
+     */
+    public boolean addToChoreography(String groupId, String dancerId) {
+        if (!activeDancers.containsKey(dancerId)) return false;
+
+        Set<String> ids = choreographyGroups.computeIfAbsent(groupId, k -> new LinkedHashSet<>());
+        if (ids.contains(dancerId)) return true;
+
+        // Retirer d'un éventuel autre groupe
+        String oldGroup = dancerToGroup.get(dancerId);
+        if (oldGroup != null && !oldGroup.equals(groupId)) {
+            removeFromChoreography(oldGroup, dancerId);
+        }
+
+        // Annuler la tâche individuelle
+        StaticDancerEntry entry = activeDancers.get(dancerId);
+        if (entry != null && entry.task != null) {
+            entry.task.cancel();
+            entry.task = null;
+        }
+
+        ids.add(dancerId);
+        dancerToGroup.put(dancerId, groupId);
+
+        // Re-démarrer la tâche de groupe avec re-synchronisation
+        BukkitTask old = groupTasks.remove(groupId);
+        if (old != null) old.cancel();
+        groupTasks.put(groupId, startGroupTask(groupId));
+        saveChoreography();
+        return true;
+    }
+
+    /**
+     * Retire un danseur d'un groupe et restaure sa tâche individuelle.
+     *
+     * @return false si le groupe ou le danseur n'existe pas dans ce groupe
+     */
+    public boolean removeFromChoreography(String groupId, String dancerId) {
+        Set<String> ids = choreographyGroups.get(groupId);
+        if (ids == null || !ids.contains(dancerId)) return false;
+
+        ids.remove(dancerId);
+        dancerToGroup.remove(dancerId);
+
+        // Restaurer la tâche individuelle
+        StaticDancerEntry entry = activeDancers.get(dancerId);
+        if (entry != null) {
+            entry.task = startAnimationLoop(entry);
+        }
+
+        if (ids.isEmpty()) {
+            BukkitTask old = groupTasks.remove(groupId);
+            if (old != null) old.cancel();
+            choreographyGroups.remove(groupId);
+        }
+
+        saveChoreography();
+        return true;
+    }
+
+    /**
+     * Arrête puis redémarre toutes les animations du groupe au même tick → re-synchronisation.
+     *
+     * @return false si le groupe n'existe pas
+     */
+    public boolean syncChoreography(String groupId) {
+        if (!choreographyGroups.containsKey(groupId)) return false;
+
+        BukkitTask old = groupTasks.remove(groupId);
+        if (old != null) old.cancel();
+        groupTasks.put(groupId, startGroupTask(groupId));
+        return true;
+    }
+
+    /**
+     * Supprime un groupe et restitue à chaque danseur sa tâche individuelle.
+     *
+     * @return false si le groupe n'existe pas
+     */
+    public boolean deleteChoreography(String groupId) {
+        Set<String> ids = choreographyGroups.remove(groupId);
+        if (ids == null) return false;
+
+        if (playlistManager != null) playlistManager.onGroupDeleted(groupId);
+
+        BukkitTask old = groupTasks.remove(groupId);
+        if (old != null) old.cancel();
+
+        for (String id : ids) {
+            dancerToGroup.remove(id);
+            StaticDancerEntry entry = activeDancers.get(id);
+            if (entry != null) {
+                entry.task = startAnimationLoop(entry);
+            }
+        }
+
+        saveChoreography();
+        return true;
+    }
+
+    /** Retourne une vue immuable des groupes de chorégraphie et de leurs membres. */
+    public Map<String, Set<String>> getChoreographyGroups() {
+        return Collections.unmodifiableMap(choreographyGroups);
+    }
+
+    /** Retourne les noms des groupes existants (pour la tab-completion). */
+    public Set<String> getChoreographyGroupIds() {
+        return Collections.unmodifiableSet(choreographyGroups.keySet());
+    }
+
+    /**
+     * Ré-enregistre tous les ModeledEntity actifs dans ModelEngine.
+     * À appeler lors de la reconnexion d'un joueur pour que ME4 renvoie les packets de spawn.
+     */
+    public void refreshAll() {
+        for (StaticDancerEntry entry : activeDancers.values()) {
+            if (entry.modeledEntity != null) {
+                try {
+                    entry.modeledEntity.registerSelf();
+                } catch (Exception e) {
+                    plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshAll", e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Change l'animation d'un danseur statique vers le style donné.
+     * La tâche individuelle DOIT être mise en pause avant d'appeler cette méthode
+     * ({@link #pauseAnimationTask}) pour éviter les conflits de redémarrage tick-à-tick.
+     * La transition est gérée par ModelEngine (lerpIn=0 = coupure nette).
+     */
+    public boolean changeAnimation(String id, String styleName) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null || entry.activeModel == null) return false;
+
+        String animName = resolveStyleAnimationName(styleName);
+        if (animName == null) return false;
+
+        String newBlueprintId = resolveStyleModelId(styleName);
+        if (newBlueprintId != null && !newBlueprintId.equals(entry.currentBlueprintId)) {
+            if (!swapModel(entry, newBlueprintId)) return false;
+        }
+
+        entry.resolvedAnimation = resolveAnimation(entry.activeModel, animName, styleName);
+        entry.styleName = styleName;
+        dbg("changeAnimation('" + id + "') → anim='" + entry.resolvedAnimation + "' blueprint='" + entry.currentBlueprintId + "'");
+        entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
+        return true;
+    }
+
+    /**
+     * Change l'animation de tous les membres d'un groupe simultanément (même tick, synchronisé).
+     * La tâche de groupe DOIT être mise en pause avant d'appeler cette méthode
+     * ({@link #pauseGroupTask}) pour éviter que la tâche ne redémarre l'ancienne animation.
+     */
+    public boolean changeGroupAnimation(String groupId, String styleName) {
+        Set<String> ids = choreographyGroups.get(groupId);
+        if (ids == null || ids.isEmpty()) return false;
+
+        String animName = resolveStyleAnimationName(styleName);
+        if (animName == null) return false;
+
+        String newBlueprintId = resolveStyleModelId(styleName);
+
+        // Phase 1 : swap de modèle si nécessaire + mise à jour des métadonnées
+        List<StaticDancerEntry> toPlay = new ArrayList<>();
+        for (String id : ids) {
+            StaticDancerEntry entry = activeDancers.get(id);
+            if (entry == null || entry.activeModel == null) continue;
+            if (newBlueprintId != null && !newBlueprintId.equals(entry.currentBlueprintId)) {
+                if (!swapModel(entry, newBlueprintId)) continue;
+            }
+            entry.resolvedAnimation = resolveAnimation(entry.activeModel, animName, styleName);
+            entry.styleName = styleName;
+            toPlay.add(entry);
+        }
+
+        dbg("changeGroupAnimation('" + groupId + "') → style='" + styleName + "' sur " + toPlay.size() + " danseur(s)");
+
+        // Phase 2 : démarrage simultané dans le même tick (lerpIn=0 = coupure nette)
+        for (StaticDancerEntry entry : toPlay) {
+            dbg("  → playAnimation('" + entry.resolvedAnimation + "') sur blueprint='" + entry.currentBlueprintId + "'");
+            entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
+        }
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Pause / Resume des tâches (utilisé par PlaylistManager)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Annule la tâche d'animation individuelle du danseur sans le détruire.
+     * Appelé par PlaylistManager quand il prend le contrôle des animations.
+     */
+    public void pauseAnimationTask(String id) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry != null && entry.task != null) {
+            entry.task.cancel();
+            entry.task = null;
+            dbg("pauseAnimationTask('" + id + "') → tâche annulée");
+        } else {
+            dbg("pauseAnimationTask('" + id + "') → rien à annuler");
+        }
+    }
+
+    /**
+     * Relance la tâche d'animation individuelle (danseur hors groupe uniquement).
+     * Appelé par PlaylistManager quand il rend le contrôle.
+     */
+    public void resumeAnimationTask(String id) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry != null && entry.task == null && !dancerToGroup.containsKey(id)) {
+            entry.task = startAnimationLoop(entry);
+            dbg("resumeAnimationTask('" + id + "') → tâche relancée (anim='" + entry.resolvedAnimation + "')");
+        } else {
+            dbg("resumeAnimationTask('" + id + "') → ignoré (entry=" + (entry != null) + " taskNull=" + (entry != null && entry.task == null) + " inGroup=" + dancerToGroup.containsKey(id) + ")");
+        }
+    }
+
+    /**
+     * Annule la tâche partagée du groupe sans dissoudre le groupe.
+     * Appelé par PlaylistManager pour éviter les conflits avec ses propres transitions.
+     */
+    public void pauseGroupTask(String groupId) {
+        BukkitTask task = groupTasks.remove(groupId);
+        if (task != null) {
+            task.cancel();
+            dbg("pauseGroupTask('" + groupId + "') → tâche annulée");
+        } else {
+            dbg("pauseGroupTask('" + groupId + "') → aucune tâche active");
+        }
+    }
+
+    /**
+     * Relance la tâche partagée du groupe SANS re-synchroniser les animations.
+     * Appelé par PlaylistManager quand il rend le contrôle du groupe.
+     */
+    public void resumeGroupTask(String groupId) {
+        if (!choreographyGroups.containsKey(groupId) || groupTasks.containsKey(groupId)) {
+            dbg("resumeGroupTask('" + groupId + "') → ignoré (existe=" + choreographyGroups.containsKey(groupId) + " déjàActif=" + groupTasks.containsKey(groupId) + ")");
+            return;
+        }
+        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            Set<String> ids = choreographyGroups.get(groupId);
+            if (ids == null) return;
+            for (String id : ids) {
+                StaticDancerEntry entry = activeDancers.get(id);
+                if (entry == null || entry.activeModel == null || entry.resolvedAnimation == null) continue;
+                if (!entry.activeModel.getAnimationHandler().isPlayingAnimation(entry.resolvedAnimation)) {
+                    entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.1, 0.1, 1.0, true);
+                }
+            }
+        }, 1L, 1L);
+        groupTasks.put(groupId, task);
+        dbg("resumeGroupTask('" + groupId + "') → tâche relancée sans re-sync");
+    }
+
+    // -------------------------------------------------------------------------
+    // Intégration PlaylistManager (callback pour le nettoyage)
+    // -------------------------------------------------------------------------
+
+    private PlaylistManager playlistManager;
+
+    /** Enregistre le PlaylistManager pour notifier les suppressions de danseurs/groupes. */
+    public void setPlaylistManager(PlaylistManager pm) {
+        this.playlistManager = pm;
+    }
+
+    private void dbg(String msg) {
+        if (playlistManager != null && playlistManager.isDebugEnabled()) {
+            plugin.getLogger().info("[StaticDancer-DEBUG] " + msg);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Persistance
+    // -------------------------------------------------------------------------
+
     public void loadFromFile() {
         File file = getDancersFile();
         if (!file.exists()) return;
@@ -212,7 +555,7 @@ public class StaticDancerManager {
             double z = ds.getDouble("z");
             float yaw = (float) ds.getDouble("yaw", 0.0);
             String style = ds.getString("style");
-            String skin = ds.getString("skin"); // null si aucun skin configuré
+            String skin = ds.getString("skin");
 
             if (worldName == null || style == null) {
                 plugin.getLogger().warning("[StaticDancer] Entrée invalide dans le fichier, ignorée: " + id);
@@ -228,7 +571,6 @@ public class StaticDancerManager {
             Location loc = new Location(world, x, y, z, yaw, 0f);
 
             if (skin != null && !skin.isBlank()) {
-                // Récupération du skin async → spawn sur le thread principal
                 final String fId = id, fStyle = style, fSkin = skin;
                 SkinService.fetchSkin(plugin, skin, profile ->
                         Bukkit.getScheduler().runTask(plugin, () ->
@@ -238,6 +580,39 @@ public class StaticDancerManager {
             } else {
                 spawnStaticDancer(id, loc, style, null, null);
             }
+        }
+    }
+
+    /**
+     * Charge les groupes de chorégraphie depuis choreography.yml.
+     * Doit être appelé APRÈS loadFromFile() + délai pour les fetches de skin.
+     */
+    public void loadChoreographyFromFile() {
+        File file = getChoreographyFile();
+        if (!file.exists()) return;
+
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        ConfigurationSection groups = yaml.getConfigurationSection("groups");
+        if (groups == null) return;
+
+        int restored = 0;
+        for (String groupId : groups.getKeys(false)) {
+            List<String> ids = groups.getStringList(groupId);
+            if (ids.isEmpty()) continue;
+
+            List<String> validIds = ids.stream().filter(activeDancers::containsKey).toList();
+            if (validIds.isEmpty()) continue;
+
+            if (validIds.size() < ids.size()) {
+                plugin.getLogger().warning("[Choreo] Groupe '" + groupId + "': "
+                        + (ids.size() - validIds.size()) + " danseur(s) introuvable(s), ignoré(s).");
+            }
+
+            if (createChoreography(groupId, validIds)) restored++;
+        }
+
+        if (restored > 0) {
+            plugin.getLogger().info("[Choreo] " + restored + " groupe(s) de chorégraphie restauré(s).");
         }
     }
 
@@ -271,9 +646,27 @@ public class StaticDancerManager {
         }
     }
 
+    private synchronized void saveChoreography() {
+        File file = getChoreographyFile();
+        YamlConfiguration yaml = new YamlConfiguration();
+        for (Map.Entry<String, Set<String>> entry : choreographyGroups.entrySet()) {
+            yaml.set("groups." + entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        try {
+            yaml.save(file);
+        } catch (IOException e) {
+            plugin.getLogger().log(Level.WARNING, "[Choreo] Impossible de sauvegarder choreography.yml", e);
+        }
+    }
+
     private File getDancersFile() {
         plugin.getDataFolder().mkdirs();
         return new File(plugin.getDataFolder(), "static_dancers.yml");
+    }
+
+    private File getChoreographyFile() {
+        plugin.getDataFolder().mkdirs();
+        return new File(plugin.getDataFolder(), "choreography.yml");
     }
 
     // -------------------------------------------------------------------------
@@ -287,6 +680,127 @@ public class StaticDancerManager {
                 entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.1, 0.1, 1.0, true);
             }
         }, 0L, 1L);
+    }
+
+    /**
+     * Démarre la tâche partagée d'un groupe après avoir synchronisé immédiatement toutes les animations.
+     */
+    private BukkitTask startGroupTask(String groupId) {
+        syncAnimations(groupId);
+        return Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            Set<String> ids = choreographyGroups.get(groupId);
+            if (ids == null) return;
+            for (String id : ids) {
+                StaticDancerEntry entry = activeDancers.get(id);
+                if (entry == null || entry.activeModel == null || entry.resolvedAnimation == null) continue;
+                if (!entry.activeModel.getAnimationHandler().isPlayingAnimation(entry.resolvedAnimation)) {
+                    entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.1, 0.1, 1.0, true);
+                }
+            }
+        }, 1L, 1L);
+    }
+
+    /**
+     * Arrête toutes les animations du groupe puis les redémarre au même tick (tick 0 partagé).
+     * fadeIn=0 pour éviter tout blend et repartir exactement depuis la frame 0.
+     */
+    private void syncAnimations(String groupId) {
+        Set<String> ids = choreographyGroups.get(groupId);
+        if (ids == null || ids.isEmpty()) return;
+
+        // Étape 1 : stop de toutes les animations
+        for (String id : ids) {
+            StaticDancerEntry entry = activeDancers.get(id);
+            if (entry == null || entry.activeModel == null || entry.resolvedAnimation == null) continue;
+            try {
+                entry.activeModel.getAnimationHandler().getClass()
+                        .getMethod("stopAnimation", String.class)
+                        .invoke(entry.activeModel.getAnimationHandler(), entry.resolvedAnimation);
+            } catch (Exception ignored) {
+                // stopAnimation peut ne pas exister selon la version de ModelEngine
+            }
+        }
+
+        // Étape 2 : restart de toutes les animations dans le même tick
+        for (String id : ids) {
+            StaticDancerEntry entry = activeDancers.get(id);
+            if (entry == null || entry.activeModel == null || entry.resolvedAnimation == null) continue;
+            entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
+        }
+    }
+
+    /** Résout le nom d'animation brut configuré pour un style de danse, ou {@code null} si inconnu. */
+    private String resolveStyleAnimationName(String styleName) {
+        ConfigurationSection section = plugin.getConfig().getConfigurationSection("dances." + styleName);
+        if (section == null) return null;
+        return section.getString("animationName");
+    }
+
+    /** Résout le blueprintId (modelId) pour un style, en tenant compte du fallback. */
+    private String resolveStyleModelId(String styleName) {
+        boolean useFallback = plugin.getConfig().getBoolean("modelEngine.useFallbackMode", false);
+        if (useFallback) return plugin.getConfig().getString("modelEngine.fallbackModelId", "joueur_fallback");
+        ConfigurationSection section = plugin.getConfig().getConfigurationSection("dances." + styleName);
+        return section == null ? null : section.getString("modelId");
+    }
+
+    /**
+     * Remplace l'ActiveModel d'une entrée par un nouveau blueprint.
+     * Tente de retirer l'ancien via reflection, ajoute le nouveau et réapplique le skin.
+     */
+    /**
+     * Remplace le modèle actif d'une entrée sans toucher au Dummy ni à la ModeledEntity.
+     * Utilise directement l'API ME4 pour retirer l'ancien modèle et ajouter le nouveau —
+     * la rotation du Dummy est ainsi préservée sans aucun respawn.
+     */
+    /**
+     * Remplace le modèle en détruisant le ModeledEntity (despawn visuel propre)
+     * tout en réutilisant le même Dummy — sa rotation est préservée, pas de glitch.
+     */
+    private boolean swapModel(StaticDancerEntry entry, String newBlueprintId) {
+        try {
+            ActiveModel newModel = ModelEngineAPI.createActiveModel(newBlueprintId);
+            if (newModel == null) {
+                plugin.getLogger().warning("[StaticDancer] Blueprint introuvable pour swap: " + newBlueprintId);
+                return false;
+            }
+
+            // Détruire l'ancienne entité (despawn visuel de tous les modèles côté client)
+            if (entry.modeledEntity != null) {
+                try { entry.modeledEntity.destroy(); } catch (Exception ignored) {}
+            }
+
+            // Recréer un ModeledEntity sur le MÊME Dummy (rotation préservée)
+            ModeledEntity newEntity = ModelEngineAPI.createModeledEntity(entry.dummy);
+            if (newEntity == null) {
+                plugin.getLogger().warning("[StaticDancer] Impossible de recréer l'entité pour swap: " + newBlueprintId);
+                return false;
+            }
+            newEntity.registerSelf();
+            newEntity.addModel(newModel, true);
+            if (entry.skinProfile != null) applySkinToModel(newModel, entry.skinProfile);
+
+            entry.modeledEntity      = newEntity;
+            entry.activeModel        = newModel;
+            entry.currentBlueprintId = newBlueprintId;
+            dbg("swapModel → blueprint='" + newBlueprintId + "' (dummy recyclé)");
+            return true;
+        } catch (Exception e) {
+            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur swap modèle → " + newBlueprintId, e);
+            return false;
+        }
+    }
+
+    /** Dissout un groupe sans sauvegarder : annule la tâche et retire les membres de dancerToGroup. */
+    private void disbandGroupInternal(String groupId) {
+        Set<String> ids = choreographyGroups.remove(groupId);
+        BukkitTask old = groupTasks.remove(groupId);
+        if (old != null) old.cancel();
+        if (ids != null) {
+            for (String id : ids) {
+                dancerToGroup.remove(id);
+            }
+        }
     }
 
     private void destroyEntry(StaticDancerEntry entry) {

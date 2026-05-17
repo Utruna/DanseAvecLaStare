@@ -10,7 +10,10 @@
       "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/docs/pipeline_skin.md\")",
       "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/docs/SKIN_RENDERING_FIX.md\")",
       "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/src/main/java/me/utruna/danse/managers/AbstractDanceStyle.java\")",
-      "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/src/main/java/me/utruna/danse/managers/PluginManager.java\")"
+      "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/src/main/java/me/utruna/danse/managers/PluginManager.java\")",
+      "Bash(Get-ChildItem -Recurse -Path \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\\\\src\\\\main\\\\java\\\\me\\\\utruna\\\\danse\\\\\" -Filter \"*.java\" | Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-Command mvn -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Command mvn.cmd -ErrorAction SilentlyContinue)"
     ]
   }
 }

@@ -366,17 +366,23 @@ public class StaticDancerManager {
     }
 
     /**
-     * Ré-enregistre tous les ModeledEntity actifs dans ModelEngine.
-     * À appeler lors de la reconnexion d'un joueur pour que ME4 renvoie les packets de spawn.
+     * Respawn propre de tous les danseurs actifs pour renvoyer les packets à un joueur qui vient de se connecter.
+     * On détruit et recrée chaque ModeledEntity (en conservant le même Dummy) afin que ME4 envoie
+     * un spawn packet frais — un simple registerSelf() peut laisser l'ActiveModel détaché côté ME4,
+     * ce qui provoque la disparition du modèle à la fin de l'animation en cours.
      */
     public void refreshAll() {
-        for (StaticDancerEntry entry : activeDancers.values()) {
-            if (entry.modeledEntity != null) {
-                try {
-                    entry.modeledEntity.registerSelf();
-                } catch (Exception e) {
-                    plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshAll", e);
+        for (Map.Entry<String, StaticDancerEntry> mapEntry : new ArrayList<>(activeDancers.entrySet())) {
+            String id = mapEntry.getKey();
+            StaticDancerEntry entry = mapEntry.getValue();
+            if (entry.currentBlueprintId == null || entry.dummy == null) continue;
+            try {
+                if (swapModel(entry, entry.currentBlueprintId) && entry.resolvedAnimation != null && entry.activeModel != null) {
+                    entry.activeModel.getAnimationHandler().playAnimation(
+                            entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
                 }
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshAll pour '" + id + "'", e);
             }
         }
     }

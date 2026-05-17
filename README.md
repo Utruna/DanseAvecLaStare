@@ -10,7 +10,19 @@ Plugin Paper (1.21.x) qui affiche des danseurs 3D animés via ModelEngine 4.
 - Java 21+
 - ModelEngine 4.0.9
 
-## Installation
+## Mise en place
+
+1. Compiler le projet ou récupérer le JAR déjà compilé.
+2. Placer le JAR du plugin dans le dossier `plugins/` du serveur, avec ModelEngine 4.0.9 installé.
+3. Démarrer le serveur une première fois pour générer les fichiers et dossiers nécessaires.
+4. Copier les modèles `.bbmodel` conformes aux règles du guide dans `plugins/ModelEngine/blueprints/`.
+5. Rafraîchir les modèles avec `/meg reload` ou redémarrer le serveur.
+6. Télécharger le resource pack généré par ModelEngine et l’ajouter à la configuration de ton propre resource pack.
+7. Lancer le serveur et profiter.
+
+Pour les contraintes de nommage, d’animation et de structure des modèles, voir [`docs/BBMODEL_INTEGRATION.md`](docs/BBMODEL_INTEGRATION.md).
+
+## Installation rapide
 
 ```bash
 mvn clean package -DskipTests

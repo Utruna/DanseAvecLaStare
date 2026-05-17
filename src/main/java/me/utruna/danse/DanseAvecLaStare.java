@@ -64,7 +64,7 @@ public class DanseAvecLaStare extends JavaPlugin {
             }, 60L);
         }
 
-        getServer().getPluginManager().registerEvents(new PlayerListener(danceManager, staticDancerManager, this), this);
+        getServer().getPluginManager().registerEvents(new PlayerListener(danceManager, playlistManager, staticDancerManager, this), this);
 
         if (getCommand("danse") != null) {
             getCommand("danse").setExecutor(this);

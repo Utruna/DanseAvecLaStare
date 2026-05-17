@@ -13,6 +13,11 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import java.lang.reflect.Method;
 import java.util.logging.Level;
 
+/**
+ * Implémentation {@link Dancer} basée sur l'API Citizens (fallback si ModelEngine est absent).
+ * Utilise la réflexion pour détecter la version de {@code SkinTrait} disponible sur le serveur
+ * et ainsi rester compatible avec plusieurs versions de Citizens.
+ */
 public class CitizensDancer implements Dancer {
 
     private final DanseAvecLaStare plugin;
@@ -24,6 +29,7 @@ public class CitizensDancer implements Dancer {
         this.plugin = plugin;
     }
 
+    /** Si {@code true}, le NPC sera masqué via {@code hideEntity} pour le joueur propriétaire. */
     public void setHiddenFromOwner(boolean hiddenFromOwner) {
         this.hiddenFromOwner = hiddenFromOwner;
     }

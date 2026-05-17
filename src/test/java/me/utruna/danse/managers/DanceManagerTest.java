@@ -1,13 +1,54 @@
 package me.utruna.danse.managers;
 
 import org.bukkit.Location;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class DanceManagerTest {
 
-    private final DanceManager danceManager = new DanceManager(null);
+    private DanceManager danceManager;
+
+    @BeforeEach
+    void setup() {
+        // Construire une config minimale avec les danses attendues
+        YamlConfiguration cfg = new YamlConfiguration();
+
+        cfg.set("dances.twist.displayName", "Twist");
+        cfg.set("dances.twist.modelId", "danseur");
+        cfg.set("dances.twist.animationName", "dance");
+        cfg.set("dances.twist.movementType", "dynamic");
+
+        cfg.set("dances.spin.displayName", "Spin");
+        cfg.set("dances.spin.modelId", "danseur");
+        cfg.set("dances.spin.animationName", "dance");
+        cfg.set("dances.spin.movementType", "dynamic");
+
+        cfg.set("dances.disco.displayName", "Disco");
+        cfg.set("dances.disco.modelId", "danseur");
+        cfg.set("dances.disco.animationName", "dance");
+        cfg.set("dances.disco.movementType", "static");
+
+        cfg.set("dances.moonwalk.displayName", "Moonwalk");
+        cfg.set("dances.moonwalk.modelId", "danseur");
+        cfg.set("dances.moonwalk.animationName", "dance");
+        cfg.set("dances.moonwalk.movementType", "dynamic");
+
+        cfg.set("dances.wave.displayName", "Wave");
+        cfg.set("dances.wave.modelId", "danseur");
+        cfg.set("dances.wave.animationName", "dance");
+        cfg.set("dances.wave.movementType", "dynamic");
+
+        cfg.set("dances.dj.displayName", "DJ");
+        cfg.set("dances.dj.modelId", "dj_animation1");
+        cfg.set("dances.dj.animationName", "dj_dance");
+        cfg.set("dances.dj.movementType", "static");
+
+        // Instancier directement DanceManager avec la configuration (pour tests sans JavaPlugin)
+        danceManager = new DanceManager(cfg);
+    }
 
     @Test
     void parseStyleShouldBeCaseInsensitive() {

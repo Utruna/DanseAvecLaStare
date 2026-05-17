@@ -4,8 +4,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.md_5.bungee.api.ChatColor;
 
+/** Utilitaires de formatage de texte pour les messages en jeu. */
 public class Utils {
-    
+
+    /**
+     * Traduit les codes couleur {@code &} et les couleurs hex {@code #RRGGBB} en codes ChatColor.
+     */
     public static String colorize(String msg) {
         Matcher match = Pattern.compile("#[a-fA-F0-9]{6}").matcher(msg);
         while (match.find()) {
@@ -15,6 +19,4 @@ public class Utils {
         }
         return ChatColor.translateAlternateColorCodes('&', msg);
     }
-    
-    // Add more utility methods here
 }

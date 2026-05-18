@@ -7,4 +7,45 @@ softdepend: [Citizens, ModelEngine]
 commands:
   danse:
     description: Lance ou arrête une danse
-    usage: /danse [twist|dj|list|stop|debug]
+    usage: /danse [twist|dj|list|stop|debug|highlight]
+
+permissions:
+  danse.player:
+    description: Accès aux commandes de base (list, stop)
+    default: true
+  danse.skin:
+    description: Utiliser le skin d'un autre joueur
+    default: false
+  danse.playlist.play:
+    description: Lancer une playlist publique sur soi-même
+    default: true
+  danse.static:
+    description: Gérer les danseurs statiques
+    default: false
+  danse.choreo:
+    description: Gérer les chorégraphies
+    default: false
+  danse.playlist:
+    description: Gérer et lancer les playlists (staff)
+    default: false
+  danse.debug:
+    description: Accès aux commandes de diagnostic
+    default: false
+  danse.style:
+    description: "Parent pour permissions par style (ex: danse.style.twist)"
+    default: false
+    children:
+      danse.style.twist: true
+      danse.style.dj: true
+  danse.*:
+    description: Accès total au plugin
+    default: false
+    children:
+      danse.player: true
+      danse.skin: true
+      danse.static: true
+      danse.choreo: true
+      danse.playlist: true
+      danse.playlist.play: true
+      danse.debug: true
+      danse.style: true

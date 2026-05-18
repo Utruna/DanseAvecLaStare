@@ -7,6 +7,7 @@ import com.ticxo.modelengine.api.model.ModeledEntity;
 import me.utruna.danse.DanseAvecLaStare;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -190,6 +191,35 @@ public class StaticDancerManager {
 
     public Set<String> getDancerIds() {
         return Collections.unmodifiableSet(activeDancers.keySet());
+    }
+
+    /**
+     * Signale un danseur avec des particules pendant {@code seconds} secondes.
+     * Retourne false si l'ID est inconnu.
+     */
+    public boolean highlightDancer(String id, int seconds) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null) return false;
+
+        Location loc = entry.location;
+        if (loc == null || loc.getWorld() == null) return true;
+
+        long totalTicks = seconds * 20L;
+        long[] elapsed = {0};
+        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+            elapsed[0] += 4;
+            if (elapsed[0] > totalTicks || !activeDancers.containsKey(id)) {
+                task.cancel();
+                return;
+            }
+            World w = loc.getWorld();
+            if (w == null) { task.cancel(); return; }
+            // Colonne visible au-dessus du danseur
+            w.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1.0, 0), 10, 0.3, 0.6, 0.3, 0.05);
+            w.spawnParticle(Particle.CRIT, loc.clone().add(0, 2.3, 0), 5, 0.15, 0.15, 0.15, 0.08);
+        }, 0L, 4L);
+
+        return true;
     }
 
     public void removeAll() {

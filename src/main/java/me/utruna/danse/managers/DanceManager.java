@@ -25,10 +25,12 @@ public class DanceManager {
     private static class DanceConfig {
         public final String modelId;
         public final String animationName;
+        public final String permission;
 
-        public DanceConfig(String modelId, String animationName) {
+        public DanceConfig(String modelId, String animationName, String permission) {
             this.modelId = modelId;
             this.animationName = animationName;
+            this.permission = permission;
         }
     }
 
@@ -99,11 +101,19 @@ public class DanceManager {
                 GenericDanceStyle style = new GenericDanceStyle(key.toLowerCase(), isStatic, pattern, 0.0, 0.0);
 
                 STYLES.put(key.toLowerCase(), style);
-                danceConfigs.put(key.toLowerCase(), new DanceConfig(modelId, animationName));
+                String permission = danceSection.getString("permission", null);
+                danceConfigs.put(key.toLowerCase(), new DanceConfig(modelId, animationName, permission));
             } catch (Exception ex) {
                 if (plugin != null) plugin.getLogger().log(Level.WARNING, "Erreur en chargeant la danse '" + key + "'", ex);
             }
         }
+    }
+
+    /** Retourne la permission requise pour lancer le style donné, ou {@code null} si aucun contrôle requis. */
+    public String getPermission(String styleName) {
+        if (styleName == null) return null;
+        DanceConfig cfg = danceConfigs.get(styleName.toLowerCase(Locale.ROOT));
+        return cfg == null ? null : cfg.permission;
     }
 
     /**

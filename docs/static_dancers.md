@@ -12,10 +12,24 @@ Les danseurs statiques sont des entités ModelEngine indépendantes des joueurs,
 /danse move <id>                   Déplace le danseur à ta position actuelle
 /danse delete <id>                 Supprime le danseur et l'efface de la sauvegarde
 /danse listID                      Liste tous les IDs actifs
+/danse highlight <id> [secondes]   Signale un danseur avec des particules (défaut : 3s)
 ```
 
-- `delete` et `listID` sont utilisables depuis la console.
-- La complétion par Tab fonctionne sur les IDs actifs pour `move` et `delete`.
+- `delete` et `listID` sont utilisables depuis la console. `highlight` nécessite un joueur.
+- La complétion par Tab fonctionne sur les IDs actifs pour `move`, `delete` et `highlight`.
+
+### highlight
+
+Fait apparaître une colonne de particules (`TOTEM_OF_UNDYING` + `CRIT`) au-dessus du danseur pendant la durée indiquée. Utile pour localiser rapidement un danseur dans une zone chargée.
+
+```
+/danse highlight lobby_dj        → particules pendant 3 secondes (défaut)
+/danse highlight lobby_dj 10     → particules pendant 10 secondes
+```
+
+- La durée est optionnelle, défaut : 3 secondes.
+- Les particules sont visibles par tous les joueurs à portée.
+- La tâche s'annule automatiquement si le danseur est supprimé avant la fin.
 
 ---
 

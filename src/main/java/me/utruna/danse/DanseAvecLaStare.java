@@ -81,6 +81,7 @@ public class DanseAvecLaStare extends JavaPlugin {
                     base.add("choreo");
                     base.add("playlist");
                     base.add("debug");
+                    base.add("highlight");
                     return base.stream()
                             .filter(s -> s.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
@@ -95,6 +96,12 @@ public class DanseAvecLaStare extends JavaPlugin {
                     String partial = args[1].toLowerCase();
                     return List.of("create", "add", "remove", "sync", "delete", "list").stream()
                             .filter(s -> s.startsWith(partial))
+                            .collect(Collectors.toList());
+                }
+                if (args.length == 2 && args[0].equalsIgnoreCase("highlight")) {
+                    String partial = args[1].toLowerCase();
+                    return staticDancerManager.getDancerIds().stream()
+                            .filter(id -> id.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
                 }
                 // /danse choreo <create|add|remove|sync|delete> <groupId>
@@ -322,6 +329,10 @@ public class DanseAvecLaStare extends JavaPlugin {
         // --- Commandes accessibles depuis la console et les joueurs ---
 
         if (args.length > 0 && args[0].equalsIgnoreCase("listID")) {
+            if (sender instanceof Player p && !p.hasPermission("danse.static")) {
+                sender.sendMessage("§cVous n'avez pas la permission d'exécuter cette commande.");
+                return true;
+            }
             Set<String> ids = staticDancerManager.getDancerIds();
             if (ids.isEmpty()) {
                 sender.sendMessage("§eAucun danseur statique actif.");
@@ -337,6 +348,10 @@ public class DanseAvecLaStare extends JavaPlugin {
                 return true;
             }
             String id = args[1];
+            if (sender instanceof Player p && !p.hasPermission("danse.static")) {
+                sender.sendMessage("§cVous n'avez pas la permission d'exécuter cette commande.");
+                return true;
+            }
             if (staticDancerManager.removeStaticDancer(id)) {
                 sender.sendMessage("§aDanseur '" + id + "' supprimé.");
             } else {
@@ -346,11 +361,32 @@ public class DanseAvecLaStare extends JavaPlugin {
         }
 
         if (args.length > 0 && args[0].equalsIgnoreCase("choreo")) {
+            if (sender instanceof Player p && !p.hasPermission("danse.choreo")) {
+                p.sendMessage("§cVous n'avez pas la permission danse.choreo.");
+                return true;
+            }
             return handleChoreoCommand(sender, args);
         }
 
         if (args.length > 0 && args[0].equalsIgnoreCase("playlist")) {
             return handlePlaylistCommand(sender, args);
+        }
+
+        if (args.length > 0 && args[0].equalsIgnoreCase("highlight")) {
+            if (!(sender instanceof Player player)) { sender.sendMessage("Joueur uniquement."); return true; }
+            if (!player.hasPermission("danse.static")) { player.sendMessage("§cVous n'avez pas la permission danse.static."); return true; }
+            if (args.length < 2) { player.sendMessage("§cUsage: §f/danse highlight <id> [secondes]"); return true; }
+            String id = args[1];
+            int seconds = 3;
+            if (args.length >= 3) {
+                try { seconds = Integer.parseInt(args[2]); } catch (NumberFormatException ignored) { seconds = 3; }
+            }
+            if (!staticDancerManager.highlightDancer(id, seconds)) {
+                player.sendMessage("§cDanseur '§f" + id + "§c' introuvable.");
+                return true;
+            }
+            player.sendMessage("§eDanseur '§f" + id + "§e' mis en surbrillance pendant §f" + seconds + "s§e.");
+            return true;
         }
 
         // --- Commandes joueur uniquement ---
@@ -360,9 +396,18 @@ public class DanseAvecLaStare extends JavaPlugin {
             return true;
         }
 
+        if (!player.hasPermission("danse.player")) {
+            player.sendMessage("§cVous n'avez pas la permission de base pour utiliser /danse.");
+            return true;
+        }
+
         if (args.length > 0 && args[0].equalsIgnoreCase("here")) {
             if (args.length < 3) {
                 player.sendMessage("§cUsage: §f/danse here <id> <style> [pseudo]");
+                return true;
+            }
+            if (!player.hasPermission("danse.static")) {
+                player.sendMessage("§cVous n'avez pas la permission danse.static.");
                 return true;
             }
             String id = args[1];
@@ -382,6 +427,10 @@ public class DanseAvecLaStare extends JavaPlugin {
 
             if (skinTarget != null && !skinTarget.isBlank()) {
                 // Skin d'un autre joueur via Mojang — récupération async puis spawn sur le thread principal
+                if (!player.hasPermission("danse.skin")) {
+                    player.sendMessage("§cVous n'avez pas la permission d'utiliser le skin d'un autre joueur.");
+                    return true;
+                }
                 player.sendMessage("§7Récupération du skin de §f" + skinTarget + "§7...");
                 SkinService.fetchSkin(this, skinTarget, (profile) -> {
                     if (profile == null) {
@@ -416,6 +465,10 @@ public class DanseAvecLaStare extends JavaPlugin {
                 player.sendMessage("§cUsage: §f/danse move <id>");
                 return true;
             }
+            if (!player.hasPermission("danse.static")) {
+                player.sendMessage("§cVous n'avez pas la permission danse.static.");
+                return true;
+            }
             String id = args[1];
             if (staticDancerManager.moveStaticDancer(id, player.getLocation())) {
                 player.sendMessage("§aDanseur '§f" + id + "§a' déplacé à ta position.");
@@ -427,6 +480,12 @@ public class DanseAvecLaStare extends JavaPlugin {
 
         try {
             if (args.length == 0) {
+                // Vérification de permission pour le style par défaut (twist)
+                String twistPerm = danceManager.getPermission("twist");
+                if (twistPerm != null && !player.hasPermission(twistPerm)) {
+                    player.sendMessage("§cVous n'avez pas la permission pour ce style de danse.");
+                    return true;
+                }
                 if (danceManager.isDancing(player.getUniqueId())) {
                     danceManager.stopDance(player.getUniqueId());
                     player.sendMessage("§aTu arrêtes de danser.");
@@ -456,6 +515,13 @@ public class DanseAvecLaStare extends JavaPlugin {
                 return true;
             }
 
+            // Vérification de permission du style
+            String stylePerm = danceManager.getPermission(style.getName());
+            if (stylePerm != null && !player.hasPermission(stylePerm)) {
+                player.sendMessage("§cVous n'avez pas la permission pour ce style de danse.");
+                return true;
+            }
+
             boolean hide = true;
             String target = null;
 
@@ -465,6 +531,12 @@ public class DanseAvecLaStare extends JavaPlugin {
                 } else {
                     target = args[1];
                 }
+            }
+
+            // Si utilisation du skin d'un autre joueur, vérifier la permission
+            if (target != null && !player.hasPermission("danse.skin")) {
+                player.sendMessage("§cVous n'avez pas la permission d'utiliser le skin d'un autre joueur.");
+                return true;
             }
 
             danceManager.startDance(player, style, hide, target);

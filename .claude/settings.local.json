@@ -13,7 +13,17 @@
       "Bash(rm \"c:/Users/Colin/OneDrive/Colin/Minecraft/Plugins/ancien/DanseAvecLaStare/src/main/java/me/utruna/danse/managers/PluginManager.java\")",
       "Bash(Get-ChildItem -Recurse -Path \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\\\\src\\\\main\\\\java\\\\me\\\\utruna\\\\danse\\\\\" -Filter \"*.java\" | Select-Object -ExpandProperty FullName)",
       "PowerShell(Get-Command mvn -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-Command mvn.cmd -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Command mvn.cmd -ErrorAction SilentlyContinue)",
+      "Bash(javap -classpath libs/ModelEngine-4.0.9.jar com.ticxo.modelengine.api.entity.Dummy)",
+      "Bash(jar tf *)",
+      "Bash(find /usr -name \"javap\")",
+      "Read(//usr/lib/**)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\" -Directory)",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(mvn compile *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(del \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\\\\src\\\\main\\\\java\\\\me\\\\utruna\\\\danse\\\\managers\\\\CitizensDancer.java\")"
     ]
   }
 }

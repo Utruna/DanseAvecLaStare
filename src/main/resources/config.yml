@@ -2,9 +2,6 @@
 # Cette version sera mise à jour automatiquement lors du déploiement de nouvelles versions
 configVersion: "1.2"
 
-# Strategy switch
-# true = use ModelEngine when plugin is present
-# false = fallback to Citizens implementation
 useModelEngine: true
 
 # Mode de secours pour les clients avec shaders / packs fragiles.
@@ -26,5 +23,23 @@ dances:
   dj:
     displayName: "DJ"
     modelId: dj_animation1
+    animationName: dance
+    movementType: dynamic
+    
+  floss:
+    displayName: "floss"
+    modelId: player_floss
+    animationName: dance
+    movementType: dynamic
+
+  macarena:
+    displayName: "macarena"
+    modelId: player_macarena
+    animationName: dance
+    movementType: dynamic
+
+  dj2:
+    displayName: "DJ2"
+    modelId: dj_animation2
     animationName: dance
     movementType: dynamic

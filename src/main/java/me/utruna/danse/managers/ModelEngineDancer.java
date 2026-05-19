@@ -95,6 +95,8 @@ public class ModelEngineDancer implements Dancer {
         debugInfo("[DEBUG] Mode de rendu=" + (useFallbackMode ? "fallback" : "standard") + ", blueprint=" + blueprintId);
         debugInfo("[DEBUG] Skin appliqué via Dummy: " + (skinProfile != null ? skinProfile.getName() : "null"));
 
+        this.dummy.getData().getTracked().setPlayerPredicate(p -> !p.getUniqueId().equals(owner.getUniqueId()));
+
         this.modeledEntity.addModel(activeModel, true);
 
         if (skinProfile != null) {
@@ -102,7 +104,6 @@ public class ModelEngineDancer implements Dancer {
         }
     }
 
-    @SuppressWarnings("deprecation")
     private void applySkinToModel() {
         try {
             debugInfo("=== APPLYING SKIN (" + (useFallbackMode ? "FALLBACK" : "STANDARD") + ") ===");
@@ -203,15 +204,6 @@ public class ModelEngineDancer implements Dancer {
         return modelId;
     }
 
-    private Object invokeMethod(Object obj, String methodName, Class<?>[] paramTypes, Object... args) {
-        try {
-            java.lang.reflect.Method method = obj.getClass().getMethod(methodName, paramTypes);
-            return method.invoke(obj, args);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     private Object invokeMethod(Object obj, String methodName) {
         try {
             java.lang.reflect.Method method = obj.getClass().getMethod(methodName);
@@ -219,11 +211,6 @@ public class ModelEngineDancer implements Dancer {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    private Object invokeMethodWithException(Object obj, String methodName, Class<?>[] paramTypes, Object... args) throws Exception {
-        java.lang.reflect.Method method = obj.getClass().getMethod(methodName, paramTypes);
-        return method.invoke(obj, args);
     }
 
     private Object invokeMethodWithException(Object obj, String methodName) throws Exception {

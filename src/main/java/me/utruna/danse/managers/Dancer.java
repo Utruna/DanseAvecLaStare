@@ -5,8 +5,7 @@ import org.bukkit.entity.Player;
 
 /**
  * Contrat d'un danseur : entité animée associée à un joueur, mise à jour chaque tick.
- * Les implémentations actuelles sont {@link ModelEngineDancer} (via ModelEngine)
- * et {@link CitizensDancer} (via Citizens, fallback).
+ * L'implémentation actuelle est {@link ModelEngineDancer} (via ModelEngine).
  */
 public interface Dancer {
 

@@ -7,6 +7,7 @@ import com.ticxo.modelengine.api.model.ModeledEntity;
 import me.utruna.danse.DanseAvecLaStare;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -46,6 +47,7 @@ public class StaticDancerManager {
         String styleName;
         String skinName;
         Location location;
+        double scale = 1.0;
     }
 
     public StaticDancerManager(DanseAvecLaStare plugin) {
@@ -177,6 +179,39 @@ public class StaticDancerManager {
         return true;
     }
 
+    /**
+     * Change le style de danse d'un danseur statique et persiste le changement.
+     * Gère automatiquement la pause/reprise de la tâche (individuelle ou de groupe).
+     */
+    public boolean changeDancerStyle(String id, String styleName) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null) return false;
+
+        String groupId = dancerToGroup.get(id);
+        if (groupId != null) {
+            pauseGroupTask(groupId);
+            boolean ok = changeAnimation(id, styleName);
+            if (ok) saveDancer(id, entry);
+            resumeGroupTask(groupId);
+            return ok;
+        } else {
+            pauseAnimationTask(id);
+            boolean ok = changeAnimation(id, styleName);
+            if (ok) saveDancer(id, entry);
+            resumeAnimationTask(id);
+            return ok;
+        }
+    }
+
+    public boolean setScale(String id, double scale) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null || entry.activeModel == null) return false;
+        entry.scale = scale;
+        entry.activeModel.setScale(scale);
+        saveDancer(id, entry);
+        return true;
+    }
+
     public boolean moveStaticDancer(String id, Location newLocation) {
         StaticDancerEntry entry = activeDancers.get(id);
         if (entry == null) return false;
@@ -190,6 +225,35 @@ public class StaticDancerManager {
 
     public Set<String> getDancerIds() {
         return Collections.unmodifiableSet(activeDancers.keySet());
+    }
+
+    /**
+     * Signale un danseur avec des particules pendant {@code seconds} secondes.
+     * Retourne false si l'ID est inconnu.
+     */
+    public boolean highlightDancer(String id, int seconds) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null) return false;
+
+        Location loc = entry.location;
+        if (loc == null || loc.getWorld() == null) return true;
+
+        long totalTicks = seconds * 20L;
+        long[] elapsed = {0};
+        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+            elapsed[0] += 4;
+            if (elapsed[0] > totalTicks || !activeDancers.containsKey(id)) {
+                task.cancel();
+                return;
+            }
+            World w = loc.getWorld();
+            if (w == null) { task.cancel(); return; }
+            // Colonne visible au-dessus du danseur
+            w.spawnParticle(Particle.TOTEM_OF_UNDYING, loc.clone().add(0, 1.0, 0), 10, 0.3, 0.6, 0.3, 0.05);
+            w.spawnParticle(Particle.CRIT, loc.clone().add(0, 2.3, 0), 5, 0.15, 0.15, 0.15, 0.08);
+        }, 0L, 4L);
+
+        return true;
     }
 
     public void removeAll() {
@@ -366,17 +430,23 @@ public class StaticDancerManager {
     }
 
     /**
-     * Ré-enregistre tous les ModeledEntity actifs dans ModelEngine.
-     * À appeler lors de la reconnexion d'un joueur pour que ME4 renvoie les packets de spawn.
+     * Respawn propre de tous les danseurs actifs pour renvoyer les packets à un joueur qui vient de se connecter.
+     * On détruit et recrée chaque ModeledEntity (en conservant le même Dummy) afin que ME4 envoie
+     * un spawn packet frais — un simple registerSelf() peut laisser l'ActiveModel détaché côté ME4,
+     * ce qui provoque la disparition du modèle à la fin de l'animation en cours.
      */
     public void refreshAll() {
-        for (StaticDancerEntry entry : activeDancers.values()) {
-            if (entry.modeledEntity != null) {
-                try {
-                    entry.modeledEntity.registerSelf();
-                } catch (Exception e) {
-                    plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshAll", e);
+        for (Map.Entry<String, StaticDancerEntry> mapEntry : new ArrayList<>(activeDancers.entrySet())) {
+            String id = mapEntry.getKey();
+            StaticDancerEntry entry = mapEntry.getValue();
+            if (entry.currentBlueprintId == null || entry.dummy == null) continue;
+            try {
+                if (swapModel(entry, entry.currentBlueprintId) && entry.resolvedAnimation != null && entry.activeModel != null) {
+                    entry.activeModel.getAnimationHandler().playAnimation(
+                            entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
                 }
+            } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshAll pour '" + id + "'", e);
             }
         }
     }
@@ -556,6 +626,7 @@ public class StaticDancerManager {
             float yaw = (float) ds.getDouble("yaw", 0.0);
             String style = ds.getString("style");
             String skin = ds.getString("skin");
+            double scale = ds.getDouble("scale", 1.0);
 
             if (worldName == null || style == null) {
                 plugin.getLogger().warning("[StaticDancer] Entrée invalide dans le fichier, ignorée: " + id);
@@ -572,13 +643,16 @@ public class StaticDancerManager {
 
             if (skin != null && !skin.isBlank()) {
                 final String fId = id, fStyle = style, fSkin = skin;
+                final double fScale = scale;
                 SkinService.fetchSkin(plugin, skin, profile ->
-                        Bukkit.getScheduler().runTask(plugin, () ->
-                                spawnStaticDancer(fId, loc, fStyle, profile, fSkin)
-                        )
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            spawnStaticDancer(fId, loc, fStyle, profile, fSkin);
+                            if (fScale != 1.0) setScale(fId, fScale);
+                        })
                 );
             } else {
                 spawnStaticDancer(id, loc, style, null, null);
+                if (scale != 1.0) setScale(id, scale);
             }
         }
     }
@@ -627,6 +701,7 @@ public class StaticDancerManager {
         yaml.set(path + ".yaw", (double) entry.location.getYaw());
         yaml.set(path + ".style", entry.styleName);
         yaml.set(path + ".skin", entry.skinName);
+        yaml.set(path + ".scale", entry.scale);
         try {
             yaml.save(file);
         } catch (IOException e) {
@@ -783,6 +858,7 @@ public class StaticDancerManager {
             entry.modeledEntity      = newEntity;
             entry.activeModel        = newModel;
             entry.currentBlueprintId = newBlueprintId;
+            if (entry.scale != 1.0) newModel.setScale(entry.scale);
             dbg("swapModel → blueprint='" + newBlueprintId + "' (dummy recyclé)");
             return true;
         } catch (Exception e) {

@@ -28,9 +28,9 @@ Le système de playlists permet de programmer des séquences d'animations avec r
 ### Lecture
 
 ```
-/danse playlist play <id> player [pseudo]   Lance sur un joueur (soi-même si pseudo omis)
-/danse playlist play <id> dancer <dancerId> Lance sur un danseur statique
-/danse playlist play <id> group  <groupId>  Lance sur un groupe chorégraphique
+/danse playlist set <id> player [pseudo]   Lance sur un joueur (soi-même si pseudo omis)
+/danse playlist set <id> dancer <dancerId> Lance sur un danseur statique
+/danse playlist set <id> group  <groupId>  Lance sur un groupe chorégraphique
 ```
 
 ### Arrêt
@@ -71,7 +71,7 @@ Le système de playlists permet de programmer des séquences d'animations avec r
 #   #2 → salsa [×3 rép.]
 
 # Lancer sur un groupe
-/danse playlist play show group scene_principale
+/danse playlist set show group scene_principale
 
 # Arrêter
 /danse playlist stop group scene_principale

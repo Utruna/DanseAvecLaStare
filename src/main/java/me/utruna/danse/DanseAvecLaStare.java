@@ -276,6 +276,15 @@ public class DanseAvecLaStare extends JavaPlugin {
             boolean needsSave = !beforeUpdate.equals(currentConfig.saveToString());
 
             if (needsSave) {
+                String timestamp = java.time.LocalDateTime.now()
+                        .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+                File backup = new File(getDataFolder(), "config.yml." + timestamp);
+                try {
+                    java.nio.file.Files.copy(configFile.toPath(), backup.toPath());
+                    getLogger().info("✓ Ancienne config sauvegardée → " + backup.getName());
+                } catch (Exception backupEx) {
+                    getLogger().log(Level.WARNING, "Impossible de sauvegarder l'ancienne config", backupEx);
+                }
                 currentConfig.save(configFile);
                 getLogger().info("✓ Config.yml mis à jour automatiquement (nouvelles clés ajoutées)");
             }

@@ -95,10 +95,9 @@ public class ModelEngineDancer implements Dancer {
         debugInfo("[DEBUG] Mode de rendu=" + (useFallbackMode ? "fallback" : "standard") + ", blueprint=" + blueprintId);
         debugInfo("[DEBUG] Skin appliqué via Dummy: " + (skinProfile != null ? skinProfile.getName() : "null"));
 
-        this.modeledEntity.addModel(activeModel, true);
+        this.dummy.getData().getTracked().setPlayerPredicate(p -> !p.getUniqueId().equals(owner.getUniqueId()));
 
-        // Délai 2 ticks : ME4 spawne ses display entities de bones de façon différée
-        org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, () -> hideDancerFromOwner(true), 2L);
+        this.modeledEntity.addModel(activeModel, true);
 
         if (skinProfile != null) {
             applySkinToModel();
@@ -302,67 +301,9 @@ public class ModelEngineDancer implements Dancer {
         return null;
     }
 
-    private void hideDancerFromOwner(boolean hide) {
-        if (owner == null) return;
-
-        // Cacher/montrer les entités visuelles de chaque bone (Display Entities en ME4 4.x)
-        if (activeModel != null) {
-            Object bonesObj = invokeMethod(activeModel, "getBones");
-            if (bonesObj instanceof java.util.Map<?, ?> bonesMap) {
-                for (Object bone : bonesMap.values()) {
-                    hideBoneEntity(owner, bone, hide);
-                }
-            }
-        }
-
-        // Cacher/montrer aussi l'entité de base du Dummy si accessible
-        org.bukkit.entity.Entity base = getBaseEntity();
-        if (base != null) {
-            if (hide) owner.hideEntity(plugin, base);
-            else owner.showEntity(plugin, base);
-            for (org.bukkit.entity.Entity passenger : base.getPassengers()) {
-                if (hide) owner.hideEntity(plugin, passenger);
-                else owner.showEntity(plugin, passenger);
-            }
-        }
-    }
-
-    private void hideBoneEntity(Player player, Object bone, boolean hide) {
-        for (String method : new String[]{"getBukkitEntity", "getEntity", "getScaffold", "getVehicle", "getBase", "getLivingEntity"}) {
-            Object e = invokeMethod(bone, method);
-            if (e instanceof org.bukkit.entity.Entity entity) {
-                if (hide) player.hideEntity(plugin, entity);
-                else player.showEntity(plugin, entity);
-                for (org.bukkit.entity.Entity passenger : entity.getPassengers()) {
-                    if (hide) player.hideEntity(plugin, passenger);
-                    else player.showEntity(plugin, passenger);
-                }
-                return;
-            }
-        }
-    }
-
-    private org.bukkit.entity.Entity getBaseEntity() {
-        // Essai via modeledEntity (plus fiable en ME4 4.x)
-        if (modeledEntity != null) {
-            Object base = invokeMethod(modeledEntity, "getBase");
-            if (base instanceof org.bukkit.entity.Entity ent) return ent;
-            if (base != null) {
-                Object e = invokeMethod(base, "getBukkitEntity");
-                if (e == null) e = invokeMethod(base, "getEntity");
-                if (e instanceof org.bukkit.entity.Entity ent) return ent;
-            }
-        }
-        if (dummy == null) return null;
-        Object e = invokeMethod(dummy, "getBukkitEntity");
-        if (e == null) e = invokeMethod(dummy, "getEntity");
-        return e instanceof org.bukkit.entity.Entity ent ? ent : null;
-    }
-
     @Override
     public void stop() {
         if (modeledEntity != null) {
-            if (owner != null) hideDancerFromOwner(false);
             modeledEntity.destroy();
             modeledEntity = null;
             activeModel = null;

@@ -13,10 +13,11 @@ Les danseurs statiques sont des entités ModelEngine indépendantes des joueurs,
 /danse delete <id>                 Supprime le danseur et l'efface de la sauvegarde
 /danse listID                      Liste tous les IDs actifs
 /danse highlight <id> [secondes]   Signale un danseur avec des particules (défaut : 3s)
+/danse scale <id> <valeur>         Redimensionne le danseur (0.1 – 5.0, défaut : 1.0)
 ```
 
-- `delete` et `listID` sont utilisables depuis la console. `highlight` nécessite un joueur.
-- La complétion par Tab fonctionne sur les IDs actifs pour `move`, `delete` et `highlight`.
+- `delete`, `listID` et `scale` sont utilisables depuis la console. `highlight` nécessite un joueur.
+- La complétion par Tab fonctionne sur les IDs actifs pour `move`, `delete`, `scale` et `highlight`.
 
 ### highlight
 
@@ -47,6 +48,7 @@ dancers:
     yaw: 90.0
     style: dj
     skin: Utruna
+    scale: 1.5
   danseur_accueil:
     world: world
     x: 50.0
@@ -55,9 +57,11 @@ dancers:
     yaw: 180.0
     style: twist
     skin: Notch
+    scale: 1.0
 ```
 
 - `skin` : pseudo du joueur dont le skin est utilisé. Null = skin par défaut (Steve/Alex).
+- `scale` : facteur d'échelle du modèle (défaut : `1.0`). Persisté dans le YAML et restauré au redémarrage.
 - Le fichier est géré automatiquement. Ne pas modifier manuellement sauf pour corriger une entrée.
 - Au **redémarrage**, les danseurs sont restaurés avec un délai de 3 secondes (60 ticks) pour laisser ModelEngine charger ses blueprints.
 - Au **onDisable**, les entités sont détruites mais le fichier est conservé.
@@ -69,9 +73,11 @@ dancers:
 1. `spawnStaticDancer()` crée un `Dummy<PlayerProfile>` avec orientation (`setYBodyRot` / `setYHeadRot`) appliquée immédiatement.
 2. L'`ActiveModel` est chargé via `createActiveModel(blueprintId)` en respectant `useFallbackMode`.
 3. Si un skin est fourni, `applySkinToModel()` applique la texture par réflexion sur les bones compatibles.
-4. Une `BukkitTask` (1 tick) relance l'animation en boucle si elle s'arrête.
-5. `saveDancer()` écrit la position, le style et le pseudo dans le YAML (`synchronized` pour les écritures concurrentes lors des fetch Mojang async).
-6. `moveStaticDancer()` met à jour `dummy.setLocation()` + `setYBodyRot/YHeadRot` et écrase l'entrée du fichier.
+4. Si `scale != 1.0`, `activeModel.setScale(scale)` est appelé après le spawn.
+5. Une `BukkitTask` (1 tick) relance l'animation en boucle si elle s'arrête.
+6. `saveDancer()` écrit la position, le style, le pseudo et l'échelle dans le YAML (`synchronized` pour les écritures concurrentes lors des fetch Mojang async).
+7. `moveStaticDancer()` met à jour `dummy.setLocation()` + `setYBodyRot/YHeadRot` et écrase l'entrée du fichier.
+8. `setScale()` appelle `activeModel.setScale()` et persiste la valeur ; l'échelle est aussi réappliquée dans `swapModel()` pour survivre aux changements d'animation.
 
 ## Gestion des erreurs
 

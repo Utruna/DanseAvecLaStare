@@ -47,6 +47,7 @@ public class StaticDancerManager {
         String styleName;
         String skinName;
         Location location;
+        double scale = 1.0;
     }
 
     public StaticDancerManager(DanseAvecLaStare plugin) {
@@ -175,6 +176,15 @@ public class StaticDancerManager {
         }
         removeDancerFromFile(id);
         plugin.getLogger().info("[StaticDancer] Danseur '" + id + "' supprimé.");
+        return true;
+    }
+
+    public boolean setScale(String id, double scale) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null || entry.activeModel == null) return false;
+        entry.scale = scale;
+        entry.activeModel.setScale(scale);
+        saveDancer(id, entry);
         return true;
     }
 
@@ -592,6 +602,7 @@ public class StaticDancerManager {
             float yaw = (float) ds.getDouble("yaw", 0.0);
             String style = ds.getString("style");
             String skin = ds.getString("skin");
+            double scale = ds.getDouble("scale", 1.0);
 
             if (worldName == null || style == null) {
                 plugin.getLogger().warning("[StaticDancer] Entrée invalide dans le fichier, ignorée: " + id);
@@ -608,13 +619,16 @@ public class StaticDancerManager {
 
             if (skin != null && !skin.isBlank()) {
                 final String fId = id, fStyle = style, fSkin = skin;
+                final double fScale = scale;
                 SkinService.fetchSkin(plugin, skin, profile ->
-                        Bukkit.getScheduler().runTask(plugin, () ->
-                                spawnStaticDancer(fId, loc, fStyle, profile, fSkin)
-                        )
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            spawnStaticDancer(fId, loc, fStyle, profile, fSkin);
+                            if (fScale != 1.0) setScale(fId, fScale);
+                        })
                 );
             } else {
                 spawnStaticDancer(id, loc, style, null, null);
+                if (scale != 1.0) setScale(id, scale);
             }
         }
     }
@@ -663,6 +677,7 @@ public class StaticDancerManager {
         yaml.set(path + ".yaw", (double) entry.location.getYaw());
         yaml.set(path + ".style", entry.styleName);
         yaml.set(path + ".skin", entry.skinName);
+        yaml.set(path + ".scale", entry.scale);
         try {
             yaml.save(file);
         } catch (IOException e) {
@@ -819,6 +834,7 @@ public class StaticDancerManager {
             entry.modeledEntity      = newEntity;
             entry.activeModel        = newModel;
             entry.currentBlueprintId = newBlueprintId;
+            if (entry.scale != 1.0) newModel.setScale(entry.scale);
             dbg("swapModel → blueprint='" + newBlueprintId + "' (dummy recyclé)");
             return true;
         } catch (Exception e) {

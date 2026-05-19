@@ -82,11 +82,12 @@ public class DanseAvecLaStare extends JavaPlugin {
                     base.add("playlist");
                     base.add("debug");
                     base.add("highlight");
+                    base.add("scale");
                     return base.stream()
                             .filter(s -> s.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
                 }
-                if (args.length == 2 && (args[0].equalsIgnoreCase("delete") || args[0].equalsIgnoreCase("move"))) {
+                if (args.length == 2 && (args[0].equalsIgnoreCase("delete") || args[0].equalsIgnoreCase("move") || args[0].equalsIgnoreCase("scale"))) {
                     String partial = args[1].toLowerCase();
                     return staticDancerManager.getDancerIds().stream()
                             .filter(id -> id.toLowerCase().startsWith(partial))
@@ -145,14 +146,14 @@ public class DanseAvecLaStare extends JavaPlugin {
                 // /danse playlist <subcommand>
                 if (args.length == 2 && args[0].equalsIgnoreCase("playlist")) {
                     String partial = args[1].toLowerCase();
-                    return List.of("create", "add", "remove", "delete", "info", "list", "play", "stop", "active", "debug").stream()
+                    return List.of("create", "add", "remove", "delete", "info", "list", "set", "stop", "active", "debug").stream()
                             .filter(s -> s.startsWith(partial)).collect(Collectors.toList());
                 }
                 // /danse playlist <create|delete|info|stop> <playlistId>
                 if (args.length == 3 && args[0].equalsIgnoreCase("playlist")) {
                     String sub = args[1].toLowerCase();
                     String partial = args[2].toLowerCase();
-                    if (List.of("add", "remove", "delete", "info", "play").contains(sub)) {
+                    if (List.of("add", "remove", "delete", "info", "set").contains(sub)) {
                         return playlistManager.getPlaylistIds().stream()
                                 .filter(id -> id.toLowerCase().startsWith(partial))
                                 .collect(Collectors.toList());
@@ -169,30 +170,30 @@ public class DanseAvecLaStare extends JavaPlugin {
                     return danceManager.getStyleNames().stream()
                             .filter(s -> s.startsWith(partial)).collect(Collectors.toList());
                 }
-                // /danse playlist play <playlistId> <player|dancer|group>
+                // /danse playlist set <playlistId> <player|dancer|group>
                 if (args.length == 4 && args[0].equalsIgnoreCase("playlist")
-                        && args[1].equalsIgnoreCase("play")) {
+                        && args[1].equalsIgnoreCase("set")) {
                     String partial = args[3].toLowerCase();
                     return List.of("player", "dancer", "group").stream()
                             .filter(s -> s.startsWith(partial)).collect(Collectors.toList());
                 }
-                // /danse playlist play <playlistId> player <playerName>
+                // /danse playlist set <playlistId> player <playerName>
                 if (args.length == 5 && args[0].equalsIgnoreCase("playlist")
-                        && args[1].equalsIgnoreCase("play") && args[3].equalsIgnoreCase("player")) {
+                        && args[1].equalsIgnoreCase("set") && args[3].equalsIgnoreCase("player")) {
                     String partial = args[4].toLowerCase();
                     return Bukkit.getOnlinePlayers().stream().map(Player::getName)
                             .filter(n -> n.toLowerCase().startsWith(partial)).collect(Collectors.toList());
                 }
-                // /danse playlist play <playlistId> dancer <dancerId>
+                // /danse playlist set <playlistId> dancer <dancerId>
                 if (args.length == 5 && args[0].equalsIgnoreCase("playlist")
-                        && args[1].equalsIgnoreCase("play") && args[3].equalsIgnoreCase("dancer")) {
+                        && args[1].equalsIgnoreCase("set") && args[3].equalsIgnoreCase("dancer")) {
                     String partial = args[4].toLowerCase();
                     return staticDancerManager.getDancerIds().stream()
                             .filter(id -> id.toLowerCase().startsWith(partial)).collect(Collectors.toList());
                 }
-                // /danse playlist play <playlistId> group <groupId>
+                // /danse playlist set <playlistId> group <groupId>
                 if (args.length == 5 && args[0].equalsIgnoreCase("playlist")
-                        && args[1].equalsIgnoreCase("play") && args[3].equalsIgnoreCase("group")) {
+                        && args[1].equalsIgnoreCase("set") && args[3].equalsIgnoreCase("group")) {
                     String partial = args[4].toLowerCase();
                     return staticDancerManager.getChoreographyGroupIds().stream()
                             .filter(id -> id.toLowerCase().startsWith(partial)).collect(Collectors.toList());
@@ -389,6 +390,35 @@ public class DanseAvecLaStare extends JavaPlugin {
             return true;
         }
 
+        if (args.length > 0 && args[0].equalsIgnoreCase("scale")) {
+            if (sender instanceof Player p && !p.hasPermission("danse.static")) {
+                sender.sendMessage("§cVous n'avez pas la permission danse.static.");
+                return true;
+            }
+            if (args.length < 3) {
+                sender.sendMessage("§cUsage: §f/danse scale <id> <valeur>");
+                return true;
+            }
+            String id = args[1];
+            double scale;
+            try {
+                scale = Double.parseDouble(args[2]);
+            } catch (NumberFormatException e) {
+                sender.sendMessage("§cValeur invalide. Entrez un nombre entre §f0.1§c et §f5.0§c.");
+                return true;
+            }
+            if (scale < 0.1 || scale > 5.0) {
+                sender.sendMessage("§cLa valeur doit être comprise entre §f0.1§c et §f5.0§c.");
+                return true;
+            }
+            if (!staticDancerManager.setScale(id, scale)) {
+                sender.sendMessage("§cAucun danseur avec l'ID: §f" + id);
+                return true;
+            }
+            sender.sendMessage("§aDanseur '§f" + id + "§a' redimensionné à §f" + scale + "§a.");
+            return true;
+        }
+
         // --- Commandes joueur uniquement ---
 
         if (!(sender instanceof Player player)) {
@@ -581,7 +611,7 @@ public class DanseAvecLaStare extends JavaPlugin {
     private boolean handlePlaylistCommand(CommandSender sender, String[] args) {
         // args[0] = "playlist"
         if (args.length < 2) {
-            sender.sendMessage("§eUsage: §f/danse playlist <create|add|remove|delete|info|list|play|stop|active>");
+            sender.sendMessage("§eUsage: §f/danse playlist <create|add|remove|delete|info|list|set|stop|active>");
             return true;
         }
 
@@ -674,12 +704,12 @@ public class DanseAvecLaStare extends JavaPlugin {
             }
 
             // --- Lecture ---
-            case "play" -> {
-                // /danse playlist play <playlistId> player [playerName]
-                // /danse playlist play <playlistId> dancer <dancerId>
-                // /danse playlist play <playlistId> group  <groupId>
+            case "set" -> {
+                // /danse playlist set <playlistId> player [playerName]
+                // /danse playlist set <playlistId> dancer <dancerId>
+                // /danse playlist set <playlistId> group  <groupId>
                 if (args.length < 4) {
-                    sender.sendMessage("§cUsage: §f/danse playlist play <id> <player|dancer|group> [cible]");
+                    sender.sendMessage("§cUsage: §f/danse playlist set <id> <player|dancer|group> [cible]");
                     return true;
                 }
                 String playlistId = args[2];
@@ -700,7 +730,7 @@ public class DanseAvecLaStare extends JavaPlugin {
                         }
                     }
                     case "dancer" -> {
-                        if (args.length < 5) { sender.sendMessage("§cUsage: §f/danse playlist play <id> dancer <dancerId>"); return true; }
+                        if (args.length < 5) { sender.sendMessage("§cUsage: §f/danse playlist set <id> dancer <dancerId>"); return true; }
                         if (playlistManager.playForDancer(args[4], playlistId)) {
                             sender.sendMessage("§aPlaylist §f'" + playlistId + "'§a lancée sur le danseur §f'" + args[4] + "'§a.");
                         } else {
@@ -708,7 +738,7 @@ public class DanseAvecLaStare extends JavaPlugin {
                         }
                     }
                     case "group" -> {
-                        if (args.length < 5) { sender.sendMessage("§cUsage: §f/danse playlist play <id> group <groupId>"); return true; }
+                        if (args.length < 5) { sender.sendMessage("§cUsage: §f/danse playlist set <id> group <groupId>"); return true; }
                         if (playlistManager.playForGroup(args[4], playlistId)) {
                             sender.sendMessage("§aPlaylist §f'" + playlistId + "'§a lancée sur le groupe §f'" + args[4] + "'§a.");
                         } else {
@@ -790,7 +820,7 @@ public class DanseAvecLaStare extends JavaPlugin {
                 sender.sendMessage("§ePlaylist debug " + (now ? "§aactivé" : "§cdésactivé") + "§e.");
             }
 
-            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: create, add, remove, delete, info, list, play, stop, active, debug");
+            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: create, add, remove, delete, info, list, set, stop, active, debug");
         }
         return true;
     }

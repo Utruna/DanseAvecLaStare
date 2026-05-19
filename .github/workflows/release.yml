@@ -22,6 +22,19 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Install ModelEngine API from secret
+        env:
+          MODELENGINE_JAR: ${{ secrets.MODELENGINE_JAR }}
+        run: |
+          echo "$MODELENGINE_JAR" | base64 -d > modelengine-api.jar
+          mvn install:install-file \
+            -Dfile=modelengine-api.jar \
+            -DgroupId=com.ticxo.modelengine \
+            -DartifactId=ModelEngine-API \
+            -Dversion=4.0.9 \
+            -Dpackaging=jar \
+            -DgeneratePom=true
+
       - name: Build with Maven
         run: mvn clean package -DskipTests
 

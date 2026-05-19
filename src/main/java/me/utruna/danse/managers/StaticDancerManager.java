@@ -179,6 +179,30 @@ public class StaticDancerManager {
         return true;
     }
 
+    /**
+     * Change le style de danse d'un danseur statique et persiste le changement.
+     * Gère automatiquement la pause/reprise de la tâche (individuelle ou de groupe).
+     */
+    public boolean changeDancerStyle(String id, String styleName) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null) return false;
+
+        String groupId = dancerToGroup.get(id);
+        if (groupId != null) {
+            pauseGroupTask(groupId);
+            boolean ok = changeAnimation(id, styleName);
+            if (ok) saveDancer(id, entry);
+            resumeGroupTask(groupId);
+            return ok;
+        } else {
+            pauseAnimationTask(id);
+            boolean ok = changeAnimation(id, styleName);
+            if (ok) saveDancer(id, entry);
+            resumeAnimationTask(id);
+            return ok;
+        }
+    }
+
     public boolean setScale(String id, double scale) {
         StaticDancerEntry entry = activeDancers.get(id);
         if (entry == null || entry.activeModel == null) return false;

@@ -6,26 +6,30 @@ Les danseurs statiques sont des entités ModelEngine indépendantes des joueurs,
 
 ## Commandes
 
+Toutes les commandes NPC passent par `/danse npc <sous-commande>`.
+
 ```
-/danse here <id> <style>           Pose un danseur à ta position avec ton skin
-/danse here <id> <style> <pseudo>  Idem avec le skin d'un autre joueur (Mojang async)
-/danse move <id>                   Déplace le danseur à ta position actuelle
-/danse delete <id>                 Supprime le danseur et l'efface de la sauvegarde
-/danse listID                      Liste tous les IDs actifs
-/danse highlight <id> [secondes]   Signale un danseur avec des particules (défaut : 3s)
-/danse scale <id> <valeur>         Redimensionne le danseur (0.1 – 5.0, défaut : 1.0)
+/danse npc spawn <id> <style>           Pose un NPC à ta position avec ton skin
+/danse npc spawn <id> <style> <pseudo>  Idem avec le skin d'un autre joueur (Mojang async)
+/danse npc move <id>                    Déplace le NPC à ta position actuelle
+/danse npc delete <id>                  Supprime le NPC et l'efface de la sauvegarde
+/danse npc list                         Liste tous les IDs actifs
+/danse npc highlight <id> [secondes]    Signale un NPC avec des particules (défaut : 3s)
+/danse npc resize <id> <valeur>         Redimensionne le NPC (0.1 – 20.0, défaut : 1.0)
+/danse npc style <id> <style>           Change le style de danse d'un NPC existant
 ```
 
-- `delete`, `listID` et `scale` sont utilisables depuis la console. `highlight` nécessite un joueur.
-- La complétion par Tab fonctionne sur les IDs actifs pour `move`, `delete`, `scale` et `highlight`.
+- `spawn` et `move` sont réservés aux joueurs (besoin de leur position).
+- `delete`, `list`, `resize`, `style` et `highlight` sont utilisables depuis la console.
+- La complétion par Tab fonctionne sur les IDs actifs et les styles disponibles.
 
 ### highlight
 
-Fait apparaître une colonne de particules (`TOTEM_OF_UNDYING` + `CRIT`) au-dessus du danseur pendant la durée indiquée. Utile pour localiser rapidement un danseur dans une zone chargée.
+Fait apparaître une colonne de particules (`TOTEM_OF_UNDYING` + `CRIT`) au-dessus du NPC pendant la durée indiquée. Utile pour localiser rapidement un NPC dans une zone chargée.
 
 ```
-/danse highlight lobby_dj        → particules pendant 3 secondes (défaut)
-/danse highlight lobby_dj 10     → particules pendant 10 secondes
+/danse npc highlight lobby_dj        → particules pendant 3 secondes (défaut)
+/danse npc highlight lobby_dj 10     → particules pendant 10 secondes
 ```
 
 - La durée est optionnelle, défaut : 3 secondes.
@@ -61,7 +65,7 @@ dancers:
 ```
 
 - `skin` : pseudo du joueur dont le skin est utilisé. Null = skin par défaut (Steve/Alex).
-- `scale` : facteur d'échelle du modèle (défaut : `1.0`). Persisté dans le YAML et restauré au redémarrage.
+- `scale` : facteur d'échelle du modèle (défaut : `1.0`, max : `20.0`). Persisté dans le YAML et restauré au redémarrage.
 - Le fichier est géré automatiquement. Ne pas modifier manuellement sauf pour corriger une entrée.
 - Au **redémarrage**, les danseurs sont restaurés avec un délai de 3 secondes (60 ticks) pour laisser ModelEngine charger ses blueprints.
 - Au **onDisable**, les entités sont détruites mais le fichier est conservé.
@@ -78,6 +82,7 @@ dancers:
 6. `saveDancer()` écrit la position, le style, le pseudo et l'échelle dans le YAML (`synchronized` pour les écritures concurrentes lors des fetch Mojang async).
 7. `moveStaticDancer()` met à jour `dummy.setLocation()` + `setYBodyRot/YHeadRot` et écrase l'entrée du fichier.
 8. `setScale()` appelle `activeModel.setScale()` et persiste la valeur ; l'échelle est aussi réappliquée dans `swapModel()` pour survivre aux changements d'animation.
+9. `changeDancerStyle()` met en pause la tâche d'animation (individuelle ou de groupe), appelle `changeAnimation()` puis relance la tâche et persiste le nouveau style dans le YAML.
 
 ## Gestion des erreurs
 

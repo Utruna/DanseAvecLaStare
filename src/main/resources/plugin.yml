@@ -1,5 +1,5 @@
 main: me.utruna.danse.DanseAvecLaStare
-version: 2.0.0
+version: 2.1.0
 name: DanseAvecLaStare
 author: Utruna
 api-version: 1.21
@@ -7,7 +7,7 @@ softdepend: [Citizens, ModelEngine]
 commands:
   danse:
     description: Lance ou arrête une danse
-    usage: /danse [twist|dj|list|stop|debug|highlight]
+    usage: /danse [style|npc <spawn|move|delete|list|highlight|resize|style>|choreo|playlist|list|stop|debug]
 
 permissions:
   danse.player:
@@ -39,7 +39,7 @@ permissions:
       danse.style.dj: true
   danse.*:
     description: Accès total au plugin
-    default: false
+    default: true
     children:
       danse.player: true
       danse.skin: true

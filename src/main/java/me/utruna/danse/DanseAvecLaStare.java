@@ -72,37 +72,51 @@ public class DanseAvecLaStare extends JavaPlugin {
                 if (args.length == 1) {
                     String partial = args[0].toLowerCase();
                     List<String> base = new ArrayList<>(danceManager.getStyleNames());
-                    base.add("here");
-                    base.add("move");
-                    base.add("listID");
+                    base.add("npc");
                     base.add("list");
-                    base.add("delete");
                     base.add("stop");
                     base.add("choreo");
                     base.add("playlist");
                     base.add("debug");
-                    base.add("highlight");
-                    base.add("scale");
                     return base.stream()
                             .filter(s -> s.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
                 }
-                if (args.length == 2 && (args[0].equalsIgnoreCase("delete") || args[0].equalsIgnoreCase("move") || args[0].equalsIgnoreCase("scale"))) {
+                // /danse npc <subcommand>
+                if (args.length == 2 && args[0].equalsIgnoreCase("npc")) {
                     String partial = args[1].toLowerCase();
-                    return staticDancerManager.getDancerIds().stream()
-                            .filter(id -> id.toLowerCase().startsWith(partial))
+                    return List.of("spawn", "move", "delete", "list", "highlight", "resize", "style").stream()
+                            .filter(s -> s.startsWith(partial)).collect(Collectors.toList());
+                }
+                // /danse npc <move|delete|highlight|resize|style> <id>
+                if (args.length == 3 && args[0].equalsIgnoreCase("npc")) {
+                    String sub = args[1].toLowerCase();
+                    if (List.of("move", "delete", "highlight", "resize", "style").contains(sub)) {
+                        String partial = args[2].toLowerCase();
+                        return staticDancerManager.getDancerIds().stream()
+                                .filter(id -> id.toLowerCase().startsWith(partial))
+                                .collect(Collectors.toList());
+                    }
+                }
+                // /danse npc spawn <id> <style>   et   /danse npc style <id> <style>
+                if (args.length == 4 && args[0].equalsIgnoreCase("npc")
+                        && (args[1].equalsIgnoreCase("spawn") || args[1].equalsIgnoreCase("style"))) {
+                    String partial = args[3].toLowerCase();
+                    return danceManager.getStyleNames().stream()
+                            .filter(s -> s.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
+                }
+                // /danse npc spawn <id> <style> <pseudo>
+                if (args.length == 5 && args[0].equalsIgnoreCase("npc")
+                        && args[1].equalsIgnoreCase("spawn")) {
+                    String partial = args[4].toLowerCase();
+                    return Bukkit.getOnlinePlayers().stream().map(Player::getName)
+                            .filter(n -> n.toLowerCase().startsWith(partial)).collect(Collectors.toList());
                 }
                 if (args.length == 2 && args[0].equalsIgnoreCase("choreo")) {
                     String partial = args[1].toLowerCase();
                     return List.of("create", "add", "remove", "sync", "delete", "list").stream()
                             .filter(s -> s.startsWith(partial))
-                            .collect(Collectors.toList());
-                }
-                if (args.length == 2 && args[0].equalsIgnoreCase("highlight")) {
-                    String partial = args[1].toLowerCase();
-                    return staticDancerManager.getDancerIds().stream()
-                            .filter(id -> id.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
                 }
                 // /danse choreo <create|add|remove|sync|delete> <groupId>
@@ -216,19 +230,6 @@ public class DanseAvecLaStare extends JavaPlugin {
                                 .filter(id -> id.toLowerCase().startsWith(partial)).collect(Collectors.toList());
                     }
                 }
-                if (args.length == 3 && args[0].equalsIgnoreCase("here")) {
-                    String partial = args[2].toLowerCase();
-                    return danceManager.getStyleNames().stream()
-                            .filter(s -> s.startsWith(partial))
-                            .collect(Collectors.toList());
-                }
-                if (args.length == 4 && args[0].equalsIgnoreCase("here")) {
-                    String partial = args[3].toLowerCase();
-                    return Bukkit.getOnlinePlayers().stream()
-                            .map(Player::getName)
-                            .filter(name -> name.toLowerCase().startsWith(partial))
-                            .collect(Collectors.toList());
-                }
                 return List.of();
             });
         }
@@ -327,39 +328,17 @@ public class DanseAvecLaStare extends JavaPlugin {
             return true;
         }
 
-        // --- Commandes accessibles depuis la console et les joueurs ---
+        // --- NPC : gestion des danseurs statiques ---
 
-        if (args.length > 0 && args[0].equalsIgnoreCase("listID")) {
+        if (args.length > 0 && args[0].equalsIgnoreCase("npc")) {
             if (sender instanceof Player p && !p.hasPermission("danse.static")) {
-                sender.sendMessage("§cVous n'avez pas la permission d'exécuter cette commande.");
+                sender.sendMessage("§cVous n'avez pas la permission danse.static.");
                 return true;
             }
-            Set<String> ids = staticDancerManager.getDancerIds();
-            if (ids.isEmpty()) {
-                sender.sendMessage("§eAucun danseur statique actif.");
-            } else {
-                sender.sendMessage("§eDanseurs statiques actifs: §f" + String.join(", ", new java.util.TreeSet<>(ids)));
-            }
-            return true;
+            return handleNpcCommand(sender, args);
         }
 
-        if (args.length > 0 && args[0].equalsIgnoreCase("delete")) {
-            if (args.length < 2) {
-                sender.sendMessage("§cUsage: /danse delete <id>");
-                return true;
-            }
-            String id = args[1];
-            if (sender instanceof Player p && !p.hasPermission("danse.static")) {
-                sender.sendMessage("§cVous n'avez pas la permission d'exécuter cette commande.");
-                return true;
-            }
-            if (staticDancerManager.removeStaticDancer(id)) {
-                sender.sendMessage("§aDanseur '" + id + "' supprimé.");
-            } else {
-                sender.sendMessage("§cAucun danseur avec l'ID: §f" + id);
-            }
-            return true;
-        }
+        // --- Chorégraphie et playlists ---
 
         if (args.length > 0 && args[0].equalsIgnoreCase("choreo")) {
             if (sender instanceof Player p && !p.hasPermission("danse.choreo")) {
@@ -373,52 +352,6 @@ public class DanseAvecLaStare extends JavaPlugin {
             return handlePlaylistCommand(sender, args);
         }
 
-        if (args.length > 0 && args[0].equalsIgnoreCase("highlight")) {
-            if (!(sender instanceof Player player)) { sender.sendMessage("Joueur uniquement."); return true; }
-            if (!player.hasPermission("danse.static")) { player.sendMessage("§cVous n'avez pas la permission danse.static."); return true; }
-            if (args.length < 2) { player.sendMessage("§cUsage: §f/danse highlight <id> [secondes]"); return true; }
-            String id = args[1];
-            int seconds = 3;
-            if (args.length >= 3) {
-                try { seconds = Integer.parseInt(args[2]); } catch (NumberFormatException ignored) { seconds = 3; }
-            }
-            if (!staticDancerManager.highlightDancer(id, seconds)) {
-                player.sendMessage("§cDanseur '§f" + id + "§c' introuvable.");
-                return true;
-            }
-            player.sendMessage("§eDanseur '§f" + id + "§e' mis en surbrillance pendant §f" + seconds + "s§e.");
-            return true;
-        }
-
-        if (args.length > 0 && args[0].equalsIgnoreCase("scale")) {
-            if (sender instanceof Player p && !p.hasPermission("danse.static")) {
-                sender.sendMessage("§cVous n'avez pas la permission danse.static.");
-                return true;
-            }
-            if (args.length < 3) {
-                sender.sendMessage("§cUsage: §f/danse scale <id> <valeur>");
-                return true;
-            }
-            String id = args[1];
-            double scale;
-            try {
-                scale = Double.parseDouble(args[2]);
-            } catch (NumberFormatException e) {
-                sender.sendMessage("§cValeur invalide. Entrez un nombre entre §f0.1§c et §f5.0§c.");
-                return true;
-            }
-            if (scale < 0.1 || scale > 5.0) {
-                sender.sendMessage("§cLa valeur doit être comprise entre §f0.1§c et §f5.0§c.");
-                return true;
-            }
-            if (!staticDancerManager.setScale(id, scale)) {
-                sender.sendMessage("§cAucun danseur avec l'ID: §f" + id);
-                return true;
-            }
-            sender.sendMessage("§aDanseur '§f" + id + "§a' redimensionné à §f" + scale + "§a.");
-            return true;
-        }
-
         // --- Commandes joueur uniquement ---
 
         if (!(sender instanceof Player player)) {
@@ -428,83 +361,6 @@ public class DanseAvecLaStare extends JavaPlugin {
 
         if (!player.hasPermission("danse.player")) {
             player.sendMessage("§cVous n'avez pas la permission de base pour utiliser /danse.");
-            return true;
-        }
-
-        if (args.length > 0 && args[0].equalsIgnoreCase("here")) {
-            if (args.length < 3) {
-                player.sendMessage("§cUsage: §f/danse here <id> <style> [pseudo]");
-                return true;
-            }
-            if (!player.hasPermission("danse.static")) {
-                player.sendMessage("§cVous n'avez pas la permission danse.static.");
-                return true;
-            }
-            String id = args[1];
-            String styleName = args[2].toLowerCase();
-            String skinTarget = args.length >= 4 ? args[3] : null;
-
-            if (staticDancerManager.getDancerIds().contains(id)) {
-                player.sendMessage("§cL'ID '§f" + id + "§c' est déjà utilisé par un danseur statique.");
-                return true;
-            }
-            if (!getServer().getPluginManager().isPluginEnabled("ModelEngine")) {
-                player.sendMessage("§cModelEngine n'est pas disponible.");
-                return true;
-            }
-
-            Location loc = player.getLocation();
-
-            if (skinTarget != null && !skinTarget.isBlank()) {
-                // Skin d'un autre joueur via Mojang — récupération async puis spawn sur le thread principal
-                if (!player.hasPermission("danse.skin")) {
-                    player.sendMessage("§cVous n'avez pas la permission d'utiliser le skin d'un autre joueur.");
-                    return true;
-                }
-                player.sendMessage("§7Récupération du skin de §f" + skinTarget + "§7...");
-                SkinService.fetchSkin(this, skinTarget, (profile) -> {
-                    if (profile == null) {
-                        player.sendMessage("§cJoueur introuvable ou erreur Mojang : §f" + skinTarget);
-                        return;
-                    }
-                    Bukkit.getScheduler().runTask(this, () -> {
-                        boolean spawned = staticDancerManager.spawnStaticDancer(id, loc, styleName, profile, skinTarget);
-                        if (spawned) {
-                            player.sendMessage("§aDanseur '§f" + id + "§a' apparu avec le skin de §f" + skinTarget + "§a.");
-                        } else {
-                            player.sendMessage("§cÉchec du spawn. Vérifie le style '§f" + styleName + "§c'.");
-                        }
-                    });
-                });
-            } else {
-                // Skin du joueur qui lance la commande — on sauvegarde son pseudo pour la restauration
-                @SuppressWarnings("deprecation")
-                PlayerProfile profile = player.getPlayerProfile();
-                boolean spawned = staticDancerManager.spawnStaticDancer(id, loc, styleName, profile, player.getName());
-                if (spawned) {
-                    player.sendMessage("§aDanseur '§f" + id + "§a' apparu avec le style '§f" + styleName + "§a'.");
-                } else {
-                    player.sendMessage("§cÉchec du spawn. Vérifie le style '§f" + styleName + "§c'.");
-                }
-            }
-            return true;
-        }
-
-        if (args.length > 0 && args[0].equalsIgnoreCase("move")) {
-            if (args.length < 2) {
-                player.sendMessage("§cUsage: §f/danse move <id>");
-                return true;
-            }
-            if (!player.hasPermission("danse.static")) {
-                player.sendMessage("§cVous n'avez pas la permission danse.static.");
-                return true;
-            }
-            String id = args[1];
-            if (staticDancerManager.moveStaticDancer(id, player.getLocation())) {
-                player.sendMessage("§aDanseur '§f" + id + "§a' déplacé à ta position.");
-            } else {
-                player.sendMessage("§cAucun danseur avec l'ID: §f" + id);
-            }
             return true;
         }
 
@@ -605,6 +461,133 @@ public class DanseAvecLaStare extends JavaPlugin {
             debugPlayers.add(id);
             return true;
         }
+    }
+
+    /** Gère les sous-commandes /danse npc. */
+    private boolean handleNpcCommand(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§eUsage: §f/danse npc <spawn|move|delete|list|highlight|resize|style>");
+            return true;
+        }
+        switch (args[1].toLowerCase()) {
+
+            case "spawn" -> {
+                if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
+                if (args.length < 4) { player.sendMessage("§cUsage: §f/danse npc spawn <id> <style> [pseudo]"); return true; }
+                String id = args[2];
+                String styleName = args[3].toLowerCase();
+                String skinTarget = args.length >= 5 ? args[4] : null;
+                if (staticDancerManager.getDancerIds().contains(id)) {
+                    player.sendMessage("§cL'ID '§f" + id + "§c' est déjà utilisé par un NPC.");
+                    return true;
+                }
+                if (!getServer().getPluginManager().isPluginEnabled("ModelEngine")) {
+                    player.sendMessage("§cModelEngine n'est pas disponible.");
+                    return true;
+                }
+                Location loc = player.getLocation();
+                if (skinTarget != null && !skinTarget.isBlank()) {
+                    if (!player.hasPermission("danse.skin")) {
+                        player.sendMessage("§cVous n'avez pas la permission d'utiliser le skin d'un autre joueur.");
+                        return true;
+                    }
+                    player.sendMessage("§7Récupération du skin de §f" + skinTarget + "§7...");
+                    SkinService.fetchSkin(this, skinTarget, (profile) -> {
+                        if (profile == null) { player.sendMessage("§cJoueur introuvable ou erreur Mojang : §f" + skinTarget); return; }
+                        Bukkit.getScheduler().runTask(this, () -> {
+                            boolean spawned = staticDancerManager.spawnStaticDancer(id, loc, styleName, profile, skinTarget);
+                            player.sendMessage(spawned
+                                    ? "§aNPC '§f" + id + "§a' créé avec le skin de §f" + skinTarget + "§a."
+                                    : "§cÉchec du spawn. Vérifie le style '§f" + styleName + "§c'.");
+                        });
+                    });
+                } else {
+                    @SuppressWarnings("deprecation")
+                    PlayerProfile profile = player.getPlayerProfile();
+                    boolean spawned = staticDancerManager.spawnStaticDancer(id, loc, styleName, profile, player.getName());
+                    player.sendMessage(spawned
+                            ? "§aNPC '§f" + id + "§a' créé avec le style '§f" + styleName + "§a'."
+                            : "§cÉchec du spawn. Vérifie le style '§f" + styleName + "§c'.");
+                }
+            }
+
+            case "move" -> {
+                if (!(sender instanceof Player player)) { sender.sendMessage("§cJoueur uniquement."); return true; }
+                if (args.length < 3) { player.sendMessage("§cUsage: §f/danse npc move <id>"); return true; }
+                String id = args[2];
+                player.sendMessage(staticDancerManager.moveStaticDancer(id, player.getLocation())
+                        ? "§aNPC '§f" + id + "§a' déplacé à ta position."
+                        : "§cAucun NPC avec l'ID: §f" + id);
+            }
+
+            case "delete" -> {
+                if (args.length < 3) { sender.sendMessage("§cUsage: §f/danse npc delete <id>"); return true; }
+                String id = args[2];
+                sender.sendMessage(staticDancerManager.removeStaticDancer(id)
+                        ? "§aNPC '§f" + id + "§a' supprimé."
+                        : "§cAucun NPC avec l'ID: §f" + id);
+            }
+
+            case "list" -> {
+                Set<String> ids = staticDancerManager.getDancerIds();
+                if (ids.isEmpty()) {
+                    sender.sendMessage("§eAucun NPC actif.");
+                } else {
+                    sender.sendMessage("§eNPCs actifs: §f" + String.join(", ", new java.util.TreeSet<>(ids)));
+                }
+            }
+
+            case "highlight" -> {
+                if (args.length < 3) { sender.sendMessage("§cUsage: §f/danse npc highlight <id> [secondes]"); return true; }
+                String id = args[2];
+                int seconds = 3;
+                if (args.length >= 4) {
+                    try { seconds = Integer.parseInt(args[3]); } catch (NumberFormatException ignored) {}
+                }
+                sender.sendMessage(staticDancerManager.highlightDancer(id, seconds)
+                        ? "§eNPC '§f" + id + "§e' mis en surbrillance pendant §f" + seconds + "s§e."
+                        : "§cNPC '§f" + id + "§c' introuvable.");
+            }
+
+            case "resize" -> {
+                if (args.length < 4) { sender.sendMessage("§cUsage: §f/danse npc resize <id> <valeur>"); return true; }
+                String id = args[2];
+                double scale;
+                try {
+                    scale = Double.parseDouble(args[3]);
+                } catch (NumberFormatException e) {
+                    sender.sendMessage("§cValeur invalide. Entrez un nombre entre §f0.1§c et §f20.0§c.");
+                    return true;
+                }
+                if (scale < 0.1 || scale > 20.0) {
+                    sender.sendMessage("§cLa valeur doit être comprise entre §f0.1§c et §f20.0§c.");
+                    return true;
+                }
+                sender.sendMessage(staticDancerManager.setScale(id, scale)
+                        ? "§aNPC '§f" + id + "§a' redimensionné à §f" + scale + "§a."
+                        : "§cAucun NPC avec l'ID: §f" + id);
+            }
+
+            case "style" -> {
+                if (args.length < 4) { sender.sendMessage("§cUsage: §f/danse npc style <id> <style>"); return true; }
+                String id = args[2];
+                String styleName = args[3].toLowerCase();
+                if (!staticDancerManager.getDancerIds().contains(id)) {
+                    sender.sendMessage("§cAucun NPC avec l'ID: §f" + id);
+                    return true;
+                }
+                if (!danceManager.getStyleNames().contains(styleName)) {
+                    sender.sendMessage("§cStyle inconnu. Styles valides: §f" + String.join(", ", danceManager.getStyleNames()));
+                    return true;
+                }
+                sender.sendMessage(staticDancerManager.changeDancerStyle(id, styleName)
+                        ? "§aNPC '§f" + id + "§a' passe sur le style §f" + styleName + "§a."
+                        : "§cÉchec du changement de style pour '§f" + id + "§c'.");
+            }
+
+            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: spawn, move, delete, list, highlight, resize, style");
+        }
+        return true;
     }
 
     /** Gère les sous-commandes /danse playlist. */

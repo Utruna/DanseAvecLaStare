@@ -20,7 +20,10 @@
       "Read(//usr/lib/**)",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\" -Directory)",
       "Bash(Select-Object -ExpandProperty Name)",
-      "Bash(mvn compile *)"
+      "Bash(mvn compile *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(del \"c:\\\\Users\\\\Colin\\\\OneDrive\\\\Colin\\\\Minecraft\\\\Plugins\\\\ancien\\\\DanseAvecLaStare\\\\src\\\\main\\\\java\\\\me\\\\utruna\\\\danse\\\\managers\\\\CitizensDancer.java\")"
     ]
   }
 }

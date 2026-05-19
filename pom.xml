@@ -6,12 +6,13 @@
 
     <groupId>me.utruna.danse</groupId>
     <artifactId>DanseAvecLaStare</artifactId>
-    <version>2.1.0</version>
-    
+    <version>${revision}</version>
+
     <name>DanseAvecLaStare</name>
     <url>http://www.example.com</url>
 
     <properties>
+        <revision>2.1.0-SNAPSHOT</revision>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>

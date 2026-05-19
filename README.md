@@ -22,7 +22,11 @@ Plugin Paper (1.21.x) qui affiche des danseurs 3D animés via ModelEngine 4.
 
 Pour les contraintes de nommage, d’animation et de structure des modèles, voir [`docs/BBMODEL_INTEGRATION.md`](docs/BBMODEL_INTEGRATION.md).
 
-## Installation rapide
+## Téléchargement
+
+Télécharge le JAR pré-compilé depuis la [dernière release](https://github.com/Utruna/DanseAvecLaStare/releases/latest).
+
+## Installation rapide (développement)
 
 ```bash
 mvn clean package -DskipTests

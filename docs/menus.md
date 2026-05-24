@@ -15,7 +15,7 @@ Cette page documente les menus d'inventaire fournis par le plugin et l'API minim
 - Player Main (`openPlayerMain`) — permet de danser, arrêter, voir la playlist active, accéder au menu staff si permission `danse.staff`.
 - Player Styles (`openPlayerStyles`) — liste des styles disponibles pour le joueur (clic gauche = lancer, clic droit = chat pour pseudo skin).
 
-- Staff Main (`openStaffMain`) — central pour le staff: accès aux danseurs statiques, chorégraphies, playlists, joueurs en ligne, créer danseur.
+- Staff Main (`openStaffMain`) — central pour le staff: accès aux danseurs statiques, chorégraphies, playlists, joueurs en ligne, paramètres d'affichage, créer danseur.
 - Staff Dancer (`openStaffDancer`) — gestion d'un danseur statique : changer style, déplacer, assigner playlist/groupe, changer skin, renommer, supprimer.
 - Staff Playlist (`openStaffPlaylist`) — éditeur d'une playlist : voir pistes, retirer piste (clic), lancer sur cible, ajouter piste.
 - Staff Playlist List (`openStaffPlaylistList`) — liste des playlists, création d'une nouvelle playlist (one-shot chat).
@@ -43,10 +43,19 @@ Cette page documente les menus d'inventaire fournis par le plugin et l'API minim
 
 - `DanceMenuManager` (exposé via constructeur dans le plugin): méthodes publiques utiles :
   - `openPlayerMain(Player p)`
+  - `openPlayerSettings(Player p)`
   - `openPlayerStyles(Player p)`
   - `openStaffMain(Player p)`
-  - `openStaffDancer(Player p, String dancerId)`
-  - `openStaffPlaylist(Player p, String playlistId)`
+  - `openStaffDancer(Player viewer, String dancerId)`
+  - `openStaffPlaylist(Player viewer, String playlistId)`
+  - `openChoreoSelectStyle(Player viewer, String groupId)`
+  - `openChoreoConfigTrack(Player viewer, String groupId, String styleName, int repetitions)`
+  - `openStaffPlaylistList(Player viewer)`
+  - `openStaffChoreoList(Player viewer)`
+  - `openStaffChoreoGroup(Player viewer, String groupId)`
+  - `openStaffPlaylistPicker(Player viewer, String targetType, String targetId)`
+  - `openTargetPicker(Player viewer, String playlistId, String targetType)`
+  - `openStaffPlayer(Player viewer, Player target)`
   - `openPlayerStylePicker(Player viewer, Player target)`
 
   Remarques d'implémentation :
@@ -57,6 +66,8 @@ Cette page documente les menus d'inventaire fournis par le plugin et l'API minim
 - `MenuListener` : écoute `InventoryClickEvent` et `InventoryCloseEvent` et délègue aux `DanceMenu`.
 
 - `MenuType` : énumère quelques types logiques utilisés par l'UI : `PLAYER_MAIN`, `PLAYER_STYLES`, `STAFF_MAIN`, `STAFF_DANCER`, `STAFF_PLAYLIST`, `STAFF_CHOREOGRAPHY`, `CHOREO_SELECT_STYLE`, `CHOREO_CONFIG_TRACK`.
+
+  Note: le menu Paramètres existe bien dans le code, mais il n'est pas encore reflété dans `MenuType`.
 
 ## Exemples d'utilisation
 

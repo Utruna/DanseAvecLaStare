@@ -11,7 +11,7 @@ Ce document décrit la hiérarchie de permissions du plugin et comment l'utilise
 ## Rôles recommandés
 - Joueur: accès de base (`danse.player`) — default: `true`.
 - DJ: accès aux styles DJ (ex. `danse.style.dj`) et aux commandes joueur.
-- Staff: accès aux commandes de gestion (`danse.static`, `danse.choreo`, `danse.playlist`).
+- Staff: accès aux commandes de gestion (`danse.static`, `danse.choreo`, `danse.playlist`) et au menu staff (`danse.staff`).
 - Admin: accès total (`danse.*`) et debug (`danse.debug`).
 
 ## Permissions principales
@@ -21,7 +21,9 @@ Ce document décrit la hiérarchie de permissions du plugin et comment l'utilise
 - `danse.choreo` — gérer les chorégraphies.
 - `danse.playlist` — créer/modifier/supprimer des playlists.
 - `danse.playlist.play` — lancer une playlist publique sur soi.
+- `danse.staff` — accéder au menu staff et aux réglages d'affichage des danseurs.
 - `danse.debug` — activer les logs techniques.
+- `danse.style` — parent pour les permissions par style (`danse.style.twist`, `danse.style.dj`, etc.).
 - `danse.style.<name>` — permission spécifique à un style (définie par `config.yml`).
 - `danse.*` — accès global (regroupe les autres).
 
@@ -54,6 +56,7 @@ dances:
 - `/danse here|move|delete|listID|highlight` : `danse.static`
 - `/danse choreo ...` : `danse.choreo`
 - `/danse playlist ...` : `danse.playlist` (sauf `play` public = `danse.playlist.play`)
+- Menu staff / réglages d'affichage : `danse.staff`
 - `/danse debug` : `danse.debug`
 
 ## Comportement de `/danse help`
@@ -64,7 +67,7 @@ dances:
 ## Exemple d'assignation (LuckPerms)
 - Joueur: `lp group joueur permission set danse.player true`
 - DJ: `lp group dj permission set danse.style.dj true`
-- Staff: `lp group staff permission set danse.static true` puis `danse.choreo`, `danse.playlist` etc.
+- Staff: `lp group staff permission set danse.staff true` puis `danse.static`, `danse.choreo`, `danse.playlist` etc.
 - Admin: `lp group admin permission set danse.* true`
 
 ## Notes d'implémentation

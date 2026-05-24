@@ -130,12 +130,6 @@ public class DanceMenuManager {
                     null); // info only
         }
 
-        register(inv, 22,
-            makeIcon(Material.COMPASS, "§bParamètres",
-                List.of("§7Distance d'affichage des danseurs",
-                    "§7et autres options à venir")),
-            (player, click) -> openPlayerSettings(player));
-
         if (p.hasPermission("danse.staff")) {
             register(inv, 26,
                     makeIcon(Material.COMMAND_BLOCK, "§cMenu Staff",
@@ -147,8 +141,12 @@ public class DanceMenuManager {
         p.openInventory(inv);
     }
 
-        public void openPlayerSettings(Player p) {
-        Inventory inv = beginOpen(p, 27, "§bParamètres", "player_settings");
+    public void openPlayerSettings(Player p) {
+        openPlayerSettings(p, false);
+    }
+
+    private void openPlayerSettings(Player p, boolean fromStaffMenu) {
+        Inventory inv = beginOpen(p, 27, "§bParamètres d'affichage", "player_settings");
 
         int currentRadius = getConfiguredRenderRadius();
 
@@ -185,10 +183,13 @@ public class DanceMenuManager {
                 List.of("§7Revient à la valeur par défaut: §f" + DEFAULT_RENDER_RADIUS)),
             (player, click) -> updateRenderRadius(player, DEFAULT_RENDER_RADIUS));
 
-        register(inv, 26, makeBack(), (player, click) -> openPlayerMain(player));
+        register(inv, 26, makeBack(), (player, click) -> {
+            if (fromStaffMenu) openStaffMain(player);
+            else openPlayerMain(player);
+        });
         fill(inv);
         p.openInventory(inv);
-        }
+    }
 
         private int getConfiguredRenderRadius() {
         return Math.max(MIN_RENDER_RADIUS,
@@ -259,6 +260,12 @@ public class DanceMenuManager {
                 makeIcon(Material.PLAYER_HEAD, "§eJoueurs en ligne",
                         List.of("§7" + Bukkit.getOnlinePlayers().size() + " connecté(s)")),
                 null); // info only
+
+        register(inv, 25,
+            makeIcon(Material.COMPASS, "§bParamètres d'affichage",
+                List.of("§7Distance d'affichage des danseurs",
+                    "§7Valeur actuelle: §f" + getConfiguredRenderRadius())),
+            (player, click) -> openPlayerSettings(player, true));
 
         // Row 1 (slots 9–17): one head per online player
         List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers());

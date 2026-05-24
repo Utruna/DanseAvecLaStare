@@ -6,6 +6,8 @@ import me.utruna.danse.managers.DanceStyle;
 import me.utruna.danse.managers.PlaylistManager;
 import me.utruna.danse.managers.SkinService;
 import me.utruna.danse.managers.StaticDancerManager;
+import me.utruna.danse.menu.DanceMenuManager;
+import me.utruna.danse.menu.MenuListener;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -36,6 +38,7 @@ public class DanseAvecLaStare extends JavaPlugin {
     private DanceManager danceManager;
     private StaticDancerManager staticDancerManager;
     private PlaylistManager playlistManager;
+    private DanceMenuManager menuManager;
     private final Set<UUID> debugPlayers = new HashSet<>();
 
     @Override
@@ -64,7 +67,9 @@ public class DanseAvecLaStare extends JavaPlugin {
             }, 60L);
         }
 
+        menuManager = new DanceMenuManager(this, danceManager, staticDancerManager, playlistManager);
         getServer().getPluginManager().registerEvents(new PlayerListener(danceManager, playlistManager, staticDancerManager, this), this);
+        getServer().getPluginManager().registerEvents(new MenuListener(menuManager), this);
 
         if (getCommand("danse") != null) {
             getCommand("danse").setExecutor(this);
@@ -77,6 +82,7 @@ public class DanseAvecLaStare extends JavaPlugin {
                     base.add("stop");
                     base.add("choreo");
                     base.add("playlist");
+                    base.add("staff");
                     base.add("debug");
                     return base.stream()
                             .filter(s -> s.toLowerCase().startsWith(partial))
@@ -337,6 +343,21 @@ public class DanseAvecLaStare extends JavaPlugin {
             return true;
         }
 
+        // --- Menu staff ---
+
+        if (args.length > 0 && args[0].equalsIgnoreCase("staff")) {
+            if (!(sender instanceof Player p)) {
+                sender.sendMessage("§cJoueur uniquement.");
+                return true;
+            }
+            if (!p.hasPermission("danse.staff")) {
+                p.sendMessage("§cVous n'avez pas la permission danse.staff.");
+                return true;
+            }
+            menuManager.openStaffMain(p);
+            return true;
+        }
+
         // --- NPC : gestion des danseurs statiques ---
 
         if (args.length > 0 && args[0].equalsIgnoreCase("npc")) {
@@ -375,20 +396,7 @@ public class DanseAvecLaStare extends JavaPlugin {
 
         try {
             if (args.length == 0) {
-                // Vérification de permission pour le style par défaut (twist)
-                String twistPerm = danceManager.getPermission("twist");
-                if (twistPerm != null && !player.hasPermission(twistPerm)) {
-                    player.sendMessage("§cVous n'avez pas la permission pour ce style de danse.");
-                    return true;
-                }
-                if (danceManager.isDancing(player.getUniqueId())) {
-                    danceManager.stopDance(player.getUniqueId());
-                    player.sendMessage("§aTu arrêtes de danser.");
-                } else {
-                    DanceStyle twist = danceManager.parseStyle("twist");
-                    danceManager.startDance(player, twist, true, null);
-                    player.sendMessage("§aTu commences à danser: §ftwist");
-                }
+                menuManager.openPlayerMain(player);
                 return true;
             }
 

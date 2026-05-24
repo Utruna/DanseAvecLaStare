@@ -1,5 +1,5 @@
 main: me.utruna.danse.DanseAvecLaStare
-version: 2.1.0
+version: 2.2.0
 name: DanseAvecLaStare
 author: Utruna
 api-version: 1.21
@@ -28,6 +28,9 @@ permissions:
   danse.playlist:
     description: Gérer et lancer les playlists (staff)
     default: false
+  danse.staff:
+    description: Accès au menu staff (gestion NPCs, playlists, chorégraphies)
+    default: false
   danse.debug:
     description: Accès aux commandes de diagnostic
     default: false
@@ -43,6 +46,7 @@ permissions:
     children:
       danse.player: true
       danse.skin: true
+      danse.staff: true
       danse.static: true
       danse.choreo: true
       danse.playlist: true

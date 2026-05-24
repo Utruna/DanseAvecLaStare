@@ -97,4 +97,4 @@ Les danseurs statiques sont sauvegardés automatiquement et restaurés au redém
 ## Configuration
 
 Les styles de danse se définissent dans `config.yml` sans recompiler.
-Voir [`docs/static_dancers.md`](docs/static_dancers.md) pour les danseurs statiques et les chorégraphies, [`docs/playlists.md`](docs/playlists.md) pour le système de playlists, et [`docs/BBMODEL_INTEGRATION.md`](docs/BBMODEL_INTEGRATION.md) pour l'intégration des modèles.
+Voir [`docs/static_dancers.md`](docs/static_dancers.md) pour les danseurs statiques et les chorégraphies, [`docs/playlists.md`](docs/playlists.md) pour le système de playlists, [`docs/menus.md`](docs/menus.md) pour la documentation des menus, et [`docs/BBMODEL_INTEGRATION.md`](docs/BBMODEL_INTEGRATION.md) pour l'intégration des modèles.

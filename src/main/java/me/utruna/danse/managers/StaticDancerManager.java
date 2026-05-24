@@ -95,7 +95,7 @@ public class StaticDancerManager {
             dummy.setLocation(location);
             dummy.setYBodyRot(location.getYaw());
             dummy.setYHeadRot(location.getYaw());
-            dummy.setRenderRadius(64);
+            dummy.setRenderRadius(256);
 
             ModeledEntity modeledEntity = ModelEngineAPI.createModeledEntity(dummy);
             if (modeledEntity == null) {
@@ -225,6 +225,87 @@ public class StaticDancerManager {
 
     public Set<String> getDancerIds() {
         return Collections.unmodifiableSet(activeDancers.keySet());
+    }
+
+    /** Returns the current style name of a static dancer, or null if not found. */
+    public String getDancerStyle(String id) {
+        StaticDancerEntry e = activeDancers.get(id);
+        return e == null ? null : e.styleName;
+    }
+
+    /** Returns the skin name used by a static dancer, or null if not found. */
+    public String getDancerSkin(String id) {
+        StaticDancerEntry e = activeDancers.get(id);
+        return e == null ? null : e.skinName;
+    }
+
+    /** Returns a clone of the dancer's spawn location, or null if not found. */
+    public Location getDancerLocation(String id) {
+        StaticDancerEntry e = activeDancers.get(id);
+        return e == null || e.location == null ? null : e.location.clone();
+    }
+
+    /** Returns the PlayerProfile used by a static dancer, or null if not found. */
+    @SuppressWarnings("deprecation")
+    public PlayerProfile getDancerProfile(String id) {
+        StaticDancerEntry e = activeDancers.get(id);
+        return e == null ? null : e.skinProfile;
+    }
+
+    /** Force le (re)démarrage immédiat de l'animation configurée du danseur. */
+    public boolean playDancerAnimation(String id) {
+        StaticDancerEntry e = activeDancers.get(id);
+        if (e == null || e.activeModel == null || e.resolvedAnimation == null) return false;
+        try {
+            e.activeModel.getAnimationHandler().playAnimation(e.resolvedAnimation, 0.0, 0.0, 1.0, true);
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    /**
+     * Applies a new skin profile to an active dancer and persists the change.
+     *
+     * @return false if the dancer doesn't exist or the profile is null
+     */
+    @SuppressWarnings("deprecation")
+    public boolean changeSkin(String id, PlayerProfile profile, String skinName) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null || profile == null) return false;
+        entry.skinProfile = profile;
+        entry.skinName    = skinName;
+        if (entry.activeModel != null) applySkinToModel(entry.activeModel, profile);
+        saveDancer(id, entry);
+        return true;
+    }
+
+    /**
+     * Renames a dancer: updates all internal maps and persistence files.
+     *
+     * @return false if {@code oldId} doesn't exist or {@code newId} is already taken
+     */
+    public boolean renameDancer(String oldId, String newId) {
+        if (!activeDancers.containsKey(oldId) || activeDancers.containsKey(newId)) return false;
+
+        StaticDancerEntry entry = activeDancers.remove(oldId);
+        activeDancers.put(newId, entry);
+
+        // Update choreography reverse-lookup and member sets
+        String groupId = dancerToGroup.remove(oldId);
+        if (groupId != null) {
+            dancerToGroup.put(newId, groupId);
+            Set<String> members = choreographyGroups.get(groupId);
+            if (members != null) {
+                members.remove(oldId);
+                members.add(newId);
+            }
+            saveChoreography();
+        }
+
+        removeDancerFromFile(oldId);
+        saveDancer(newId, entry);
+        return true;
     }
 
     /**

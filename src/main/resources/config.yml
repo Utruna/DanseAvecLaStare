@@ -1,11 +1,16 @@
-# Strategy switch
-# true = use ModelEngine when plugin is present
-# false = fallback to Citizens implementation
+# Configuration du plugin DanseAvecLaStare
+# Cette version sera mise à jour automatiquement lors du déploiement de nouvelles versions
+configVersion: "1.3"
+
 useModelEngine: true
 
+# Mode de secours pour les clients avec shaders / packs fragiles.
+# true = charge un blueprint alternatif plus simple et applique les textures de façon dynamique.
 modelEngine:
-  defaultModelId: danseur
-  defaultAnimationName: dance
+  useFallbackMode: false
+  fallbackModelId: joueur_fallback
+  renderRadius: 256
+
 
 # Configuration des dances - Chaque style de danse est défini ici
 # Ajoute une nouvelle danse sans modifier le code Java, juste la config !
@@ -14,34 +19,28 @@ dances:
     displayName: "Twist"
     modelId: danseur
     animationName: dance
-    movementType: dynamic        # static ou dynamic
-
-  spin:
-    displayName: "Spin"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic
-
-  disco:
-    displayName: "Disco"
-    modelId: danseur
-    animationName: dance
-    movementType: static
-
-  moonwalk:
-    displayName: "Moonwalk"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic
-
-  wave:
-    displayName: "Wave"
-    modelId: danseur
-    animationName: dance
     movementType: dynamic
 
   dj:
     displayName: "DJ"
     modelId: dj_animation1
+    animationName: dance
+    movementType: dynamic
+    
+  floss:
+    displayName: "floss"
+    modelId: player_floss
+    animationName: dance
+    movementType: dynamic
+
+  macarena:
+    displayName: "macarena"
+    modelId: player_macarena
+    animationName: dance
+    movementType: dynamic
+
+  dj2:
+    displayName: "DJ2"
+    modelId: dj_animation2
     animationName: dance
     movementType: dynamic

@@ -1,115 +1,115 @@
-# Guide d'integration bbmodel (ModelEngine)
+# Guide d'intégration BBMODEL
 
-Ce document explique comment integrer correctement un modele `.bbmodel` avec DanseAvecLaStare.
+Objectif : préparer un `.bbmodel` compatible avec l'application du skin joueur via ModelEngine 4.0.9.
 
-## 1. Prerequis
+---
 
-- Paper/Spigot 1.21.x
-- ModelEngine 4.0.9 installe et actif
-- DanseAvecLaStare deploye
-- Resource pack ModelEngine fonctionnel cote client
+## Pipeline technique
 
-## 2. Emplacement des modeles
+Flux d'exécution pour appliquer un skin sur un modèle animé :
 
-Placer les blueprints dans:
+1. Récupérer le `PlayerProfile` (sync depuis le joueur connecté, ou via `SkinService` async pour un pseudo tiers).
+2. Créer un `Dummy<PlayerProfile>` et l'enregistrer auprès de ModelEngine (`createModeledEntity`).
+3. Charger l'`ActiveModel` correspondant au `modelId` et l'attacher via `addModel(...)`.
+4. Parcourir `activeModel.getBones()` ; pour chaque bone exposant un behavior `PlayerLimb`, appeler `setTexture(profile)`.
+5. Lancer l'animation via `activeModel.getAnimationHandler().playAnimation(animationName, ...)`.
 
-`plugins/ModelEngine/blueprints/`
+> `Dummy<PlayerProfile>` est la source de vérité du skin côté serveur.  
+> Si `setTexture` est appelé correctement sur chaque limb mais que le rendu reste absent, le problème est dans le `.bbmodel` ou le resource pack client — pas dans le code Java.
 
-Exemples:
+---
 
-- `plugins/ModelEngine/blueprints/danseur.bbmodel`
-- `plugins/ModelEngine/blueprints/visible-test.bbmodel`
+## Préparation du .bbmodel
 
-## 3. Configuration du plugin
+**Nommage des bones (obligatoire)**
 
-Fichier a editer sur le serveur:
+Les bones de premier niveau doivent avoir exactement ces noms pour que ModelEngine détecte les `PlayerLimb` :
 
-`plugins/DanseAvecLaStare/config.yml`
+| Bone exact        | Membre         |
+|-------------------|----------------|
+| `phead_head`      | Tête           |
+| `pbody_body`      | Torse          |
+| `prarm_right_arm` | Bras droit     |
+| `plarm_left_arm`  | Bras gauche    |
+| `prleg_right_leg` | Jambe droite   |
+| `plleg_left_leg`  | Jambe gauche   |
 
-Configuration minimale:
+La hiérarchie attendue dans Blockbench est la suivante (seul le premier niveau compte pour la détection) :
 
-```yml
-useModelEngine: true
-
-modelEngine:
-  defaultModelId: danseur
-  styleModels:
-    twist: danseur
-    spin: visible-test
+```
+waist
+├── phead_head
+│   ├── Head
+│   └── Hat Layer
+├── pbody_body
+│   ├── Body
+│   └── Body Layer
+├── prarm_right_arm
+│   ├── Right_arm
+│   └── Right Arm Layer
+├── plarm_left_arm
+│   ├── Left_arm
+│   └── Left Arm Layer
+├── prleg_right_leg
+│   ├── Right_leg
+│   └── Right Leg Layer
+└── plleg_left_leg
+    ├── Left_leg
+    └── Left Leg Layer
 ```
 
-Regle importante:
+**Nom de l'animation (obligatoire)**
 
-- `defaultModelId` sert de fallback global.
-- `styleModels.<style>` permet de mapper chaque danse vers un blueprint specifique.
-- L'ancienne cle `modelEngine.modelId` reste supportee en fallback.
+L'animation doit s'appeler exactement **`dance`** dans Blockbench. La config `animationName: dance` dans `config.yml` doit correspondre à ce nom.
 
-## 4. Exigences du blueprint
+**Règles de géométrie**
 
-- Le blueprint doit etre charge par ModelEngine.
-- Le blueprint doit contenir une animation nommee exactement `dance`.
-- Si objectif skin dynamique joueur:
-  - le blueprint doit etre prepare pour Player Skin Mapping
-  - UV et materiaux doivent etre compatibles avec le rendu skin attendu
+- Chaque limb doit avoir des cubes visibles et ne doit pas être placé dans un groupe masqué.
+- Chaque limb doit être indépendant (pas parenté à la tête ou à un autre limb).
 
-## 5. Cycle de test
+---
 
-1. Redemarrer le serveur (recommande) ou `/meg reload`.
-2. Lancer `/danse debug`.
-3. Verifier:
-   - ModelEngine actif
-   - `useModelEngine=true`
-  - `defaultModelId` correct
-  - mapping `styleModels` correct
-  - blueprint(s) present(s)
-4. Lancer `/danse twist`.
-5. Verifier:
-   - modele visible
-   - animation `dance` active
+## Intégration dans ModelEngine
 
-## 6. Erreurs frequentes
+1. Exporter le `.bbmodel` depuis Blockbench (conserver textures et animations).
+2. Copier le fichier dans `plugins/ModelEngine/blueprints/`.
+3. Vérifier côté serveur : `createActiveModel(modelId)` retourne un `ActiveModel` non nul.
+4. Lancer `/danse debug` et vérifier que les bones `PlayerLimb` sont détectés (`Bones found: N`) et que `✓ Skin applied` apparaît pour chaque limb attendu.
+5. Vérifier que l'animation `dance` est bien présente dans le blueprint (visible dans les logs debug si le nom ne correspond pas).
 
-### 6.1 Rien ne s'affiche
+---
 
-Verifier:
+## Vérification rapide
 
-- `useModelEngine` active dans le bon config serveur
-- `modelId` correct
-- plugin ModelEngine actif
-- blueprint present
+**Côté serveur (logs `/danse debug`)**
+- `Bones found: N` — valeur non nulle
+- `✓ Skin applied` pour chaque limb attendu
+- `activeModel != null`
 
-### 6.2 Cube rose/noir (magenta/noir)
+**Côté modèle / client**
+- L'animation dans Blockbench s'appelle bien `dance` (et `animationName: dance` dans `config.yml`)
+- Les cubes des limbs sont présents et visibles dans Blockbench
+- Le resource pack ModelEngine est correctement chargé par le client
 
-Cause probable: texture manquante ou resource pack non applique.
+---
 
-Actions:
+## Dépannage
 
-- verifier les chemins de textures dans le blueprint
-- regenerer/recharger le pack ModelEngine
-- verifier que le client accepte le pack
+**Procédure d'isolation recommandée**
 
-### 6.3 Le modele apparait mais n'anime pas
+Créer un `.bbmodel` minimal avec `phead_` uniquement, puis réintroduire les membres un à un et tester à chaque étape :
 
-Cause probable: animation `dance` absente ou nom differente.
+1. `phead_` → confirmer que la tête affiche le skin
+2. `pbody_` → confirmer que le torse affiche le skin
+3. `prarm_` / `plarm_` → bras droit puis gauche
+4. `prleg_` / `plleg_` → jambes
 
-Action: renommer/ajouter l'animation `dance` dans le `.bbmodel`.
+**Points techniques**
 
-### 6.4 Le skin joueur ne s'applique pas
+- `HeadForcedImpl` est un behavior interne ajouté automatiquement par ModelEngine ; ne pas tenter de le supprimer depuis le plugin.
+- Si la tête fonctionne mais pas les autres membres, le problème est dans la géométrie du `.bbmodel` ou le resource pack côté client, pas dans le code Java.
+- `setTexture(PlayerProfile)` est l'approche principale ; `setTexture(Player)` est implémenté en fallback via réflexion.
 
-Cause probable: blueprint non prepare pour Player Skin Mapping.
+**Si le problème persiste**
 
-Action: adapter le modele (UV/materials) a un workflow skin joueur.
-
-## 7. Commandes utiles
-
-- `/danse debug`
-- `/danse list`
-- `/danse twist`
-- `/danse stop`
-- `/meg reload`
-
-## 8. Rappel implementation code
-
-- Le choix Citizens/ModelEngine est gere dans `DanceManager`.
-- Le rendu bbmodel est gere dans `ModelEngineDancer`.
-- Le modele utilise est configurable via `modelEngine.modelId`.
+Joindre le `.bbmodel` et les logs de `/danse debug` dans une issue pour analyse.

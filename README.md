@@ -1,196 +1,100 @@
 # DanseAvecLaStare
 
-Plugin Minecraft Paper 1.21.1 permettant aux joueurs de lancer des animations de danse via des modèles 3D rendus par **ModelEngine 4**.
+Plugin Paper (1.21.x) qui affiche des danseurs 3D animés via ModelEngine 4.
 
 ---
 
-## Présentation
+## Prérequis
 
-DanseAvecLaStare est un plugin entièrement **configuration-driven** qui exploite ModelEngine 4 (R4.0.9) pour afficher des danseurs 3D avec animations dynamiques. Les modèles sont positionnés selon des patterns de mouvement paramétrables (statique, rotations, vagues, orbites, etc.).
+- Paper 1.21.x
+- Java 21+
+- ModelEngine 4.0.9
 
-**Pas de code Java à modifier pour ajouter une danse.** Tout se configure en YAML.
+## Mise en place
 
----
+1. Compiler le projet ou récupérer le JAR déjà compilé.
+2. Placer le JAR du plugin dans le dossier `plugins/` du serveur, avec ModelEngine 4.0.9 installé.
+3. Démarrer le serveur une première fois pour générer les fichiers et dossiers nécessaires.
+4. Copier les modèles `.bbmodel` conformes aux règles du guide dans `plugins/ModelEngine/blueprints/`.
+5. Rafraîchir les modèles avec `/meg reload` ou redémarrer le serveur.
+6. Télécharger le resource pack généré par ModelEngine et l’ajouter à la configuration de ton propre resource pack.
+7. Lancer le serveur et profiter.
 
-## Système Dynamique
+Pour les contraintes de nommage, d’animation et de structure des modèles, voir [`docs/BBMODEL_INTEGRATION.md`](docs/BBMODEL_INTEGRATION.md).
 
-### Architecture
+## Téléchargement
 
-L'ensemble des styles de danse est défini dans `config.yml`, section `dances:`. À chaque démarrage, le plugin :
+Télécharge le JAR pré-compilé depuis la [dernière release](https://github.com/Utruna/DanseAvecLaStare/releases/latest).
 
-1. Charge la configuration YAML
-2. Crée dynamiquement des instances `GenericDanceStyle` pour chaque style
-3. Associe chaque style à un modèle ModelEngine et une animation
-
-### Ajouter une Nouvelle Danse
-
-Pour ajouter un style de danse **sans recompiler** :
-
-1. **Créer le modèle** : Ajouter un fichier `.bbmodel` dans le dossier ModelEngine du serveur
-2. **Configurer en YAML** : Ajouter une entrée dans la section `dances:` du `config.yml`
-3. **Recharger** : Relancer le plugin ou redémarrer le serveur
-
-Aucun redéploiement JAR requis.
-
----
-
-## Guide de Configuration
-
-Fichier : `plugins/DanseAvecLaStare/config.yml`
-
-### Structure Globale
-
-```yaml
-useModelEngine: true
-
-modelEngine:
-  defaultModelId: danseur
-  defaultAnimationName: dance
-
-dances:
-  # Chaque style ici
-```
-
-### Paramètres par Style
-
-```yaml
-dances:
-  <styleName>:
-    displayName: "Nom Affiché"
-    modelId: <blueprintId>
-    animationName: <animName>
-    movementType: <STATIC|SPIN|ORBIT|WAVE|MOONWALK>
-    rotationSpeed: <degres/tick>
-    radius: <blocs>
-```
-
-#### Détail des Paramètres
-
-| Paramètre | Type | Description |
-|-----------|------|-------------|
-| `displayName` | String | Nom affiché aux joueurs via `/danse list` |
-| `modelId` | String | ID du blueprint ModelEngine (défini dans le fichier `.bbmodel`) |
-| `animationName` | String | Nom de l'animation à jouer en boucle |
-| `movementType` | Enum | Pattern de mouvement : `STATIC` (immobile), `DYNAMIC` (bouge) |
-| `rotationSpeed` | Float | Vitesse en degrés/tick pour `SPIN` et `ORBIT` |
-| `radius` | Float | Rayon en blocs pour `ORBIT` et `WAVE` |
-
-#### Exemple Complet
-
-```yaml
-dances:
-  twist:
-    displayName: "Twist"
-    modelId: danseur
-    animationName: dance
-    movementType: DYNAMIC
-    rotationSpeed: 0.0
-    radius: 0.0
-
-  spin:
-    displayName: "Spin Rapide"
-    modelId: danseur
-    animationName: dance
-    movementType: DYNAMIC
-    rotationSpeed: 5.0
-    radius: 0.0
-```
-
----
-
-## Commandes
-
-### Utilisation
-
-```
-/danse <style>              Lance le style de danse spécifié
-/danse list                 Affiche les styles disponibles
-/danse stop                 Arrête la danse courante
-/danse debug                Affiche l'état du plugin (ModelEngine, config, blueprints)
-```
-
-### Exemples
-
-```
-/danse twist                # Lancer la danse "twist"
-/danse list                 # Voir les styles
-/danse stop                 # Arrêter
-/danse debug                # Diagnostic
-```
-
----
-
-## Prérequis Graphiques
-
-### ModelEngine et Blockbench
-
-Le skin mapping (option pour styles futurs) **exige une nomenclature stricte des bones** dans Blockbench :
-
-| Bone | Utilisation |
-|------|-------------|
-| `head` | Tête du joueur |
-| `body` | Torse |
-| `left_arm` | Bras gauche |
-| `right_arm` | Bras droit |
-| `left_leg` | Jambe gauche |
-| `right_leg` | Jambe droite |
-
-**État actuel** : Le skin mapping n'est pas encore fonctionnel. Si l'implémentation réussit, les blueprints devront respecter **obligatoirement** cette hiérarchie de bones pour que les skins se plaquent correctement sur le modèle 3D.
-
-### Installation des Blueprints
-
-1. Exporter le blueprint depuis Blockbench au format `.bbmodel`
-2. Placer le fichier dans : `plugins/ModelEngine/blueprints/`
-3. Redémarrer ModelEngine ou le serveur
-4. Ajouter une entrée `dances:` dans `config.yml` pointant sur l'ID du blueprint
-
----
-
-## Installation & Build
-
-### Prérequis Serveur
-
-- **Paper** 1.21.1 (ou compatible Bukkit API)
-- **ModelEngine** 4.0.9+
-- **Java** 21+
-
-### Build Local
+## Installation rapide (développement)
 
 ```bash
 mvn clean package -DskipTests
 ```
 
-JAR généré : `target/DanseAvecLaStare-VERSION.jar`
-
-### Déploiement
-
-1. Copier le JAR dans `plugins/`
-2. Redémarrer le serveur
-3. Vérifier la config dans `plugins/DanseAvecLaStare/config.yml`
+Copier le JAR `target/DanseAvecLaStare-*.jar` dans `plugins/` puis redémarrer.
 
 ---
 
-## Architecture Technique
+## Commandes
 
-### Classes Clés
+**Danses joueur**
 
-- **DanceManager** : Orchestration des danses, chargement config, gestion du cycle de vie
-- **GenericDanceStyle** : Implémentation unifiée des styles de mouvement
-- **ModelEngineDancer** : Intégration ModelEngine 4 — création Dummy, modèles, animations
-- **SkinService** : Récupération asynchrone des profils joueur via Mojang API
+| Commande | Description |
+|---|---|
+| `/danse <style>` | Lance une danse avec ton skin |
+| `/danse <style> <pseudo>` | Lance une danse avec le skin d'un autre joueur |
+| `/danse stop` | Arrête la danse |
+| `/danse list` | Liste les styles disponibles |
+| `/danse debug` | Active/désactive les logs de diagnostic |
 
-### Pattern de Mouvement
+**NPC (danseurs statiques)**
 
-Les styles sont paramétrés par `movementType` :
+| Commande | Description |
+|---|---|
+| `/danse npc spawn <id> <style> [pseudo]` | Crée un NPC à ta position |
+| `/danse npc move <id>` | Déplace un NPC à ta position |
+| `/danse npc delete <id>` | Supprime un NPC |
+| `/danse npc list` | Liste les NPCs actifs |
+| `/danse npc style <id> <style>` | Change le style de danse d'un NPC |
+| `/danse npc resize <id> <valeur>` | Redimensionne un NPC (0.1 – 20.0) |
+| `/danse npc highlight <id> [secondes]` | Signale un NPC avec des particules |
 
-- **STATIC** : Position fixe
-- **DYNAMIC** : mouvement basé sur le bbmodel
+Les danseurs statiques sont sauvegardés automatiquement et restaurés au redémarrage.
 
+**Chorégraphie** — synchronisation de groupes de danseurs statiques
+
+| Commande | Description |
+|---|---|
+| `/danse choreo create <groupId> <id1> [id2…]` | Crée un groupe et synchronise les animations |
+| `/danse choreo add <groupId> <id>` | Ajoute un danseur au groupe |
+| `/danse choreo remove <groupId> <id>` | Retire un danseur du groupe |
+| `/danse choreo sync <groupId>` | Re-synchronise les animations du groupe |
+| `/danse choreo delete <groupId>` | Dissout le groupe (les danseurs reprennent en solo) |
+| `/danse choreo list` | Liste tous les groupes et leurs membres |
+
+**Playlists** — séquences d'animations programmées
+
+| Commande | Description |
+|---|---|
+| `/danse playlist create <id> [loop\|once]` | Crée une playlist (en boucle par défaut) |
+| `/danse playlist add <id> <style> <rép>` | Ajoute une piste (style × N répétitions) |
+| `/danse playlist remove <id> <index>` | Supprime une piste par index |
+| `/danse playlist delete <id>` | Supprime la playlist |
+| `/danse playlist info <id>` | Affiche les pistes de la playlist |
+| `/danse playlist list` | Liste toutes les playlists |
+| `/danse playlist play <id> player [pseudo]` | Lance la playlist sur un joueur |
+| `/danse playlist play <id> dancer <dancerId>` | Lance la playlist sur un danseur statique |
+| `/danse playlist play <id> group <groupId>` | Lance la playlist sur un groupe |
+| `/danse playlist stop player [pseudo]` | Arrête la playlist d'un joueur |
+| `/danse playlist stop dancer <dancerId>` | Arrête la playlist d'un danseur |
+| `/danse playlist stop group <groupId>` | Arrête la playlist d'un groupe |
+| `/danse playlist active` | Affiche toutes les playlists en cours |
+| `/danse playlist debug` | Active/désactive les logs de diagnostic playlist |
 
 ---
 
-## Notes
+## Configuration
 
-- Les danses sont chargées **au démarrage du plugin**.
-- Le skin mapping est en développement.
-- Chaque danse rend le joueur invisible pour afficher le modèle 3D.
+Les styles de danse se définissent dans `config.yml` sans recompiler.
+Voir [`docs/static_dancers.md`](docs/static_dancers.md) pour les danseurs statiques et les chorégraphies, [`docs/playlists.md`](docs/playlists.md) pour le système de playlists, [`docs/menus.md`](docs/menus.md) pour la documentation des menus, et [`docs/BBMODEL_INTEGRATION.md`](docs/BBMODEL_INTEGRATION.md) pour l'intégration des modèles.

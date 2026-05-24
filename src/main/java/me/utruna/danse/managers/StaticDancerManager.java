@@ -95,7 +95,7 @@ public class StaticDancerManager {
             dummy.setLocation(location);
             dummy.setYBodyRot(location.getYaw());
             dummy.setYHeadRot(location.getYaw());
-            dummy.setRenderRadius(256);
+            dummy.setRenderRadius(plugin.getConfig().getInt("modelEngine.renderRadius", 256));
 
             ModeledEntity modeledEntity = ModelEngineAPI.createModeledEntity(dummy);
             if (modeledEntity == null) {
@@ -243,6 +243,22 @@ public class StaticDancerManager {
     public Location getDancerLocation(String id) {
         StaticDancerEntry e = activeDancers.get(id);
         return e == null || e.location == null ? null : e.location.clone();
+    }
+
+    /** Returns the current scale of a static dancer, or 1.0 if not found. */
+    public double getDancerScale(String id) {
+        StaticDancerEntry e = activeDancers.get(id);
+        return e == null ? 1.0 : e.scale;
+    }
+
+    /** Met à jour la distance d'affichage de tous les danseurs statiques déjà actifs. */
+    public void applyRenderRadiusToActiveDancers(int radius) {
+        int clampedRadius = Math.max(1, radius);
+        for (StaticDancerEntry entry : activeDancers.values()) {
+            if (entry != null && entry.dummy != null) {
+                entry.dummy.setRenderRadius(clampedRadius);
+            }
+        }
     }
 
     /** Returns the PlayerProfile used by a static dancer, or null if not found. */

@@ -35,6 +35,7 @@ public class ModelEngineDancer implements Dancer {
     private ModeledEntity modeledEntity;
     private ActiveModel activeModel;
     private String resolvedAnimationName;
+    private int renderRadius;
     private final List<String> availableAnimationNames = new ArrayList<>();
 
     public ModelEngineDancer(DanseAvecLaStare plugin, String modelId, String animationName, PlayerProfile skinProfile) {
@@ -47,6 +48,7 @@ public class ModelEngineDancer implements Dancer {
         this.fallbackModelId = configuredFallbackModelId == null || configuredFallbackModelId.isBlank()
             ? "joueur_fallback"
             : configuredFallbackModelId.trim();
+        this.renderRadius = plugin.getConfig().getInt("modelEngine.renderRadius", 256);
     }
 
     private boolean isDebugEnabled() {
@@ -76,7 +78,7 @@ public class ModelEngineDancer implements Dancer {
 
         this.dummy = new Dummy<>(skinProfile);
         this.dummy.setLocation(location);
-        this.dummy.setRenderRadius(64);
+        this.dummy.setRenderRadius(renderRadius);
 
         this.modeledEntity = ModelEngineAPI.createModeledEntity(dummy);
         if (this.modeledEntity == null) {
@@ -308,6 +310,14 @@ public class ModelEngineDancer implements Dancer {
             modeledEntity = null;
             activeModel = null;
             dummy = null;
+        }
+    }
+
+    @Override
+    public void setRenderRadius(int radius) {
+        this.renderRadius = Math.max(1, radius);
+        if (dummy != null) {
+            dummy.setRenderRadius(this.renderRadius);
         }
     }
 }

@@ -30,4 +30,8 @@ public interface Dancer {
 
     /** Détruit l'entité et libère toutes les ressources associées. */
     void stop();
+
+    /** Met à jour la distance d'affichage si l'implémentation le supporte. */
+    default void setRenderRadius(int radius) {
+    }
 }

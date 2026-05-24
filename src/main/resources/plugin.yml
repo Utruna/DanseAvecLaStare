@@ -1,5 +1,5 @@
 main: me.utruna.danse.DanseAvecLaStare
-version: 2.2.0
+version: 2.3.0
 name: DanseAvecLaStare
 author: Utruna
 api-version: 1.21
@@ -42,7 +42,7 @@ permissions:
       danse.style.dj: true
   danse.*:
     description: Accès total au plugin
-    default: true
+    default: op
     children:
       danse.player: true
       danse.skin: true

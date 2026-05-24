@@ -258,6 +258,32 @@ public class DanceManager {
         runningDances.keySet().forEach(this::stopDance);
     }
 
+    /** Met à jour la distance d'affichage des dummies ModelEngine déjà spawnés pour les joueurs. */
+    public void applyRenderRadiusToActiveDances(int radius) {
+        int clampedRadius = Math.max(1, radius);
+        for (RunningDance running : runningDances.values()) {
+            if (running != null && running.dancer != null) {
+                running.dancer.setRenderRadius(clampedRadius);
+            }
+        }
+    }
+
+    /** Force la restauration de la visibilité d'un joueur (utilitaire admin). */
+    public void restoreVisibility(UUID uuid) {
+        // Remove any running dance state and ensure player is visible
+        runningDances.remove(uuid);
+        Player p = Bukkit.getPlayer(uuid);
+        if (p != null) p.setInvisible(false);
+    }
+
+    /** Force la restauration de la visibilité pour tous les joueurs. */
+    public void restoreAllVisibility() {
+        runningDances.clear();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            p.setInvisible(false);
+        }
+    }
+
     /** Retourne la liste triée des identifiants de styles disponibles. */
     public List<String> getStyleNames() {
         return STYLES.keySet().stream().sorted().collect(Collectors.toList());

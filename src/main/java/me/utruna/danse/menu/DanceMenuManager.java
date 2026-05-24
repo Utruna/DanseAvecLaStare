@@ -31,6 +31,9 @@ import java.util.*;
 public class DanceMenuManager {
 
     static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
+    private static final int MIN_RENDER_RADIUS = 1;
+    private static final int MAX_RENDER_RADIUS = 256;
+    private static final int DEFAULT_RENDER_RADIUS = 256;
 
     private final DanseAvecLaStare plugin;
     private final DanceManager dm;
@@ -127,6 +130,12 @@ public class DanceMenuManager {
                     null); // info only
         }
 
+        register(inv, 22,
+            makeIcon(Material.COMPASS, "§bParamètres",
+                List.of("§7Distance d'affichage des danseurs",
+                    "§7et autres options à venir")),
+            (player, click) -> openPlayerSettings(player));
+
         if (p.hasPermission("danse.staff")) {
             register(inv, 26,
                     makeIcon(Material.COMMAND_BLOCK, "§cMenu Staff",
@@ -137,6 +146,64 @@ public class DanceMenuManager {
         fill(inv);
         p.openInventory(inv);
     }
+
+        public void openPlayerSettings(Player p) {
+        Inventory inv = beginOpen(p, 27, "§bParamètres", "player_settings");
+
+        int currentRadius = getConfiguredRenderRadius();
+
+        register(inv, 11,
+                makeIcon(Material.RED_STAINED_GLASS_PANE, "§c−16",
+                    List.of("§7Réduit la distance d'affichage")),
+                (player, click) -> updateRenderRadius(player, currentRadius - 16));
+
+        register(inv, 12,
+                makeIcon(Material.RED_STAINED_GLASS_PANE, "§c−1",
+                    List.of("§7Réduit la distance d'affichage")),
+                (player, click) -> updateRenderRadius(player, currentRadius - 1));
+
+        register(inv, 13,
+            makeIcon(Material.ENDER_EYE, "§fDistance d'affichage",
+                    List.of("§7Actuelle: §f" + currentRadius,
+                        "§7Boutons: §c−16 §7/ §c−1 §7/ §a+1 §7/ §a+16",
+                        "§7Plage: §f1§7 à §f256",
+                        "§8Valeur appliquée immédiatement")),
+                null);
+
+        register(inv, 14,
+                makeIcon(Material.GREEN_STAINED_GLASS_PANE, "§a+1",
+                List.of("§7Augmente la distance d'affichage")),
+                (player, click) -> updateRenderRadius(player, currentRadius + 1));
+
+        register(inv, 15,
+                makeIcon(Material.GREEN_STAINED_GLASS_PANE, "§a+16",
+                List.of("§7Augmente la distance d'affichage")),
+                (player, click) -> updateRenderRadius(player, currentRadius + 16));
+
+        register(inv, 22,
+            makeIcon(Material.LIGHT_BLUE_DYE, "§bRéinitialiser",
+                List.of("§7Revient à la valeur par défaut: §f" + DEFAULT_RENDER_RADIUS)),
+            (player, click) -> updateRenderRadius(player, DEFAULT_RENDER_RADIUS));
+
+        register(inv, 26, makeBack(), (player, click) -> openPlayerMain(player));
+        fill(inv);
+        p.openInventory(inv);
+        }
+
+        private int getConfiguredRenderRadius() {
+        return Math.max(MIN_RENDER_RADIUS,
+                    Math.min(MAX_RENDER_RADIUS, plugin.getConfig().getInt("modelEngine.renderRadius", DEFAULT_RENDER_RADIUS)));
+        }
+
+        private void updateRenderRadius(Player player, int requestedRadius) {
+        int radius = Math.max(MIN_RENDER_RADIUS, Math.min(MAX_RENDER_RADIUS, requestedRadius));
+            plugin.getConfig().set("modelEngine.renderRadius", radius);
+        plugin.saveConfig();
+        sdm.applyRenderRadiusToActiveDancers(radius);
+        dm.applyRenderRadiusToActiveDances(radius);
+        player.sendMessage("§aDistance d'affichage réglée à §f" + radius + "§a.");
+        openPlayerSettings(player);
+        }
 
     public void openPlayerStyles(Player p) {
         Inventory inv = beginOpen(p, 27, "§aStyles de danse", "player_styles");
@@ -242,6 +309,30 @@ public class DanceMenuManager {
         String styleStr = sdm.getDancerStyle(dancerId);
         register(inv, 2, makeIcon(Material.MUSIC_DISC_13, "§fStyle",
                 List.of(styleStr != null ? "§7" + styleStr : "§8N/A")), null);
+
+        double scale = sdm.getDancerScale(dancerId);
+        register(inv, 3,
+                makeIcon(Material.AMETHYST_SHARD, "§fTaille",
+                        List.of("§7Actuelle: §f" + formatScale(scale),
+                                "§7clic gauche/droit: §c-0.1 §7/ §a+0.1",
+                                "§7shift+clic: §c-0.5 §7/ §a+0.5")),
+                (player, click) -> {
+                    double delta = switch (click) {
+                        case LEFT -> -0.1;
+                        case RIGHT -> 0.1;
+                        case SHIFT_LEFT -> -0.5;
+                        case SHIFT_RIGHT -> 0.5;
+                        default -> 0.0;
+                    };
+                    if (delta == 0.0) return;
+                    double next = Math.max(0.1, Math.min(20.0, Math.round((sdm.getDancerScale(dancerId) + delta) * 10.0) / 10.0));
+                    if (sdm.setScale(dancerId, next)) {
+                        player.sendMessage("§aTaille du danseur ajustée à §f" + formatScale(next) + "§a.");
+                        openStaffDancer(player, dancerId);
+                    } else {
+                        player.sendMessage("§cDanseur introuvable.");
+                    }
+                });
 
         // ── Row 1 — actions ───────────────────────────────────────────────
         register(inv, 9,
@@ -468,7 +559,7 @@ public class DanceMenuManager {
                 final String id = ids.get(i);
                 DancerSnapshot snap = snapshotDancer(id);
                 register(inv, i,
-                    makeHeadFromProfile(snap.skinProfile, "§f" + id,
+                    makeHeadFromProfile(snap.skinProfile(), "§f" + id,
                         List.of("§7style: §f" + snap.styleName(),
                             "§7skin: §f" + snap.skinName())),
                     (player, click) -> openStaffDancer(player, id));
@@ -570,16 +661,17 @@ public class DanceMenuManager {
         for (int i = 0; i < members.size() && i < 8; i++) {
             final String mid = members.get(i);
             String pl = pm.getActivePlaylistForDancer(mid);
+            DancerSnapshot snap = snapshotDancer(mid);
             register(inv, i,
-                    makeIcon(Material.PLAYER_HEAD, "§f" + mid,
-                            List.of("§7" + (pl != null ? "playlist: " + pl : "solo"),
-                                    "§cshift+clic → retirer")),
-                    (player, click) -> {
-                        if (click != ClickType.SHIFT_LEFT && click != ClickType.SHIFT_RIGHT) return;
-                        sdm.removeFromChoreography(groupId, mid);
-                        player.sendMessage("§a" + mid + " §aretired du groupe §f" + groupId + "§a.");
-                        openStaffChoreoGroup(player, groupId);
-                    });
+                makeHeadFromProfile(snap.skinProfile(), "§f" + mid,
+                    List.of("§7" + (pl != null ? "playlist: " + pl : "solo"),
+                        "§cshift+clic → retirer")),
+                (player, click) -> {
+                if (click != ClickType.SHIFT_LEFT && click != ClickType.SHIFT_RIGHT) return;
+                sdm.removeFromChoreography(groupId, mid);
+                player.sendMessage("§a" + mid + " §aretired du groupe §f" + groupId + "§a.");
+                openStaffChoreoGroup(player, groupId);
+                });
         }
         if (members.size() > 8)
             register(inv, 7, makeIcon(Material.GRAY_STAINED_GLASS_PANE,
@@ -790,6 +882,20 @@ public class DanceMenuManager {
                     else openStaffMain(player);
                 });
 
+        register(inv, 12,
+                makeIcon(Material.LIME_DYE, "§aRendre visible", List.of("§7Force la visibilité si bloquée")),
+                (player, click) -> {
+                    if (!player.hasPermission("danse.staff") && !player.isOp()) {
+                        player.sendMessage("§cVous n'avez pas la permission danse.staff.");
+                        return;
+                    }
+                    dm.restoreVisibility(target.getUniqueId());
+                    player.sendMessage("§aVisibilité rétablie pour §f" + target.getName() + "§a.");
+                    Player fresh = Bukkit.getPlayer(target.getUniqueId());
+                    if (fresh != null) openStaffPlayer(player, fresh);
+                    else openStaffMain(player);
+                });
+
         register(inv, 11,
                 makeIcon(Material.BOOK, "§aLancer playlist", List.of()),
                 (player, click) -> openStaffPlaylistPicker(player, "player",
@@ -850,7 +956,7 @@ public class DanceMenuManager {
                 final String did = candidates.get(i);
                 DancerSnapshot snap = snapshotDancer(did);
                 register(inv, i,
-                        makeIcon(Material.PLAYER_HEAD, "§f" + did,
+                    makeHeadFromProfile(snap.skinProfile(), "§f" + did,
                                 List.of("§7style: §f" + snap.styleName(),
                                         "§aclic → ajouter au groupe")),
                         (player, click) -> {
@@ -896,8 +1002,8 @@ public class DanceMenuManager {
         inv.setItem(0, makeDisc(styleName)); // [nodim]
 
         register(inv, 9,
-                makeIcon(Material.RED_STAINED_GLASS_PANE, "§c−5", List.of()),
-                (player, click) -> openPlaylistTrackConfig(player, playlistId, styleName, Math.max(1, reps - 5)));
+            makeIcon(Material.RED_STAINED_GLASS_PANE, "§c−5", List.of()),
+            (player, click) -> openPlaylistTrackConfig(player, playlistId, styleName, Math.max(1, reps - 5)));
         register(inv, 10,
                 makeIcon(Material.RED_STAINED_GLASS_PANE, "§c−1", List.of()),
                 (player, click) -> openPlaylistTrackConfig(player, playlistId, styleName, Math.max(1, reps - 1)));
@@ -987,6 +1093,10 @@ public class DanceMenuManager {
     // ── Snapshot helper ───────────────────────────────────────────────────
 
     record DancerSnapshot(String styleName, String skinName, PlayerProfile skinProfile) {}
+
+    private String formatScale(double scale) {
+        return String.format(Locale.ROOT, "%.1f", scale);
+    }
 
     private DancerSnapshot snapshotDancer(String id) {
         String style = sdm.getDancerStyle(id);

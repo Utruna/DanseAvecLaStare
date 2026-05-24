@@ -382,6 +382,34 @@ public class DanseAvecLaStare extends JavaPlugin {
             return handlePlaylistCommand(sender, args);
         }
 
+        // --- Fix visibilité bloquée (admin / console) ---
+        if (args.length > 0 && args[0].equalsIgnoreCase("fixvisible")) {
+            // Usage: /danse fixvisible [player]
+            if (args.length == 1) {
+                if (sender instanceof Player p) {
+                    danceManager.restoreVisibility(p.getUniqueId());
+                    p.sendMessage("§aVisibilité rétablie pour vous.");
+                } else {
+                    sender.sendMessage("Usage: /danse fixvisible <player>");
+                }
+                return true;
+            }
+            // Target specified
+            String target = args[1];
+            Player tp = Bukkit.getPlayerExact(target);
+            if (tp == null) {
+                sender.sendMessage("§cJoueur introuvable: " + target);
+                return true;
+            }
+            if (sender instanceof Player p && !p.hasPermission("danse.staff") && !p.isOp()) {
+                p.sendMessage("§cVous n'avez pas la permission danse.staff.");
+                return true;
+            }
+            danceManager.restoreVisibility(tp.getUniqueId());
+            sender.sendMessage("§aVisibilité rétablie pour " + tp.getName() + ".");
+            return true;
+        }
+
         // --- Commandes joueur uniquement ---
 
         if (!(sender instanceof Player player)) {

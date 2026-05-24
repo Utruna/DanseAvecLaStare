@@ -130,6 +130,7 @@ public class PlaylistManager {
         tracks.add(new Track(styleName, durationTicks));
         playlists.put(id, new Playlist(id, tracks, p.loop));
         saveToFile();
+        resyncPlaylist(id);
         return true;
     }
 
@@ -146,6 +147,7 @@ public class PlaylistManager {
         tracks.remove(index);
         playlists.put(id, new Playlist(id, tracks, p.loop));
         saveToFile();
+        resyncPlaylist(id);
         return true;
     }
 
@@ -343,6 +345,15 @@ public class PlaylistManager {
         groupRunners.clear();
     }
 
+    /**
+     * Re-synchronise tous les runners actifs qui lisent cette playlist après une modification.
+     */
+    public void resyncPlaylist(String playlistId) {
+        resyncPlayerRunners(playlistId);
+        resyncDancerRunners(playlistId);
+        resyncGroupRunners(playlistId);
+    }
+
     // -------------------------------------------------------------------------
     // Persistance
     // -------------------------------------------------------------------------
@@ -426,6 +437,64 @@ public class PlaylistManager {
         runner.playlistId    = playlistId;
         runner.currentIndex  = 0;
         return runner;
+    }
+
+    private void resyncPlayerRunners(String playlistId) {
+        for (Map.Entry<UUID, PlaylistRunner> entry : new ArrayList<>(playerRunners.entrySet())) {
+            UUID playerId = entry.getKey();
+            PlaylistRunner runner = entry.getValue();
+            if (!playlistId.equals(runner.playlistId)) continue;
+
+            Playlist playlist = playlists.get(playlistId);
+            cancelTask(runner);
+            if (playlist == null || playlist.tracks.isEmpty()) {
+                playerRunners.remove(playerId);
+                danceManager.stopDance(playerId);
+                continue;
+            }
+
+            runner.currentIndex = Math.max(0, Math.min(runner.currentIndex, playlist.tracks.size() - 1));
+            applyPlayerTrack(playerId, playlist.tracks.get(runner.currentIndex));
+            schedulePlayerNext(playerId, runner, playlist);
+        }
+    }
+
+    private void resyncDancerRunners(String playlistId) {
+        for (Map.Entry<String, PlaylistRunner> entry : new ArrayList<>(dancerRunners.entrySet())) {
+            String dancerId = entry.getKey();
+            PlaylistRunner runner = entry.getValue();
+            if (!playlistId.equals(runner.playlistId)) continue;
+
+            Playlist playlist = playlists.get(playlistId);
+            cancelTask(runner);
+            if (playlist == null || playlist.tracks.isEmpty()) {
+                dancerRunners.remove(dancerId);
+                continue;
+            }
+
+            runner.currentIndex = Math.max(0, Math.min(runner.currentIndex, playlist.tracks.size() - 1));
+            staticDancerManager.changeAnimation(dancerId, playlist.tracks.get(runner.currentIndex).styleName());
+            scheduleDancerNext(dancerId, runner, playlist);
+        }
+    }
+
+    private void resyncGroupRunners(String playlistId) {
+        for (Map.Entry<String, PlaylistRunner> entry : new ArrayList<>(groupRunners.entrySet())) {
+            String groupId = entry.getKey();
+            PlaylistRunner runner = entry.getValue();
+            if (!playlistId.equals(runner.playlistId)) continue;
+
+            Playlist playlist = playlists.get(playlistId);
+            cancelTask(runner);
+            if (playlist == null || playlist.tracks.isEmpty()) {
+                groupRunners.remove(groupId);
+                continue;
+            }
+
+            runner.currentIndex = Math.max(0, Math.min(runner.currentIndex, playlist.tracks.size() - 1));
+            staticDancerManager.changeGroupAnimation(groupId, playlist.tracks.get(runner.currentIndex).styleName());
+            scheduleGroupNext(groupId, runner, playlist);
+        }
     }
 
     private void cancelTask(PlaylistRunner runner) {

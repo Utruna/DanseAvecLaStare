@@ -4,7 +4,6 @@ import me.utruna.danse.DanseAvecLaStare;
 import me.utruna.danse.managers.DanceManager;
 import me.utruna.danse.managers.DanceStyle;
 import me.utruna.danse.managers.PlaylistManager;
-import me.utruna.danse.managers.SkinService;
 import me.utruna.danse.managers.StaticDancerManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -1268,20 +1267,18 @@ public class DanceMenuManager {
                 });
                 return;
             }
-            // SkinService callback runs on an async thread → schedule main-thread work
-            SkinService.fetchSkin(plugin, skinName, profile ->
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        Player p = Bukkit.getPlayer(viewerId);
-                        if (p == null) return;
-                        if (profile == null) {
-                            p.sendMessage("§cSkin not found for §f" + skinName + "§c.");
-                        } else {
-                            boolean ok = sdm.changeSkin(dancerId, profile, skinName);
-                            p.sendMessage(ok ? "§aSkin changed to §f" + skinName + "§a."
-                                            : "§cDancer §f" + dancerId + " §cnot found.");
-                        }
-                        openStaffDancer(p, dancerId);
-                    }));
+            PlayerProfile profile = Bukkit.createPlayerProfile(
+                    UUID.nameUUIDFromBytes(skinName.getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                    skinName
+            );
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player p = Bukkit.getPlayer(viewerId);
+                if (p == null) return;
+                boolean ok = sdm.changeSkin(dancerId, profile, skinName);
+                p.sendMessage(ok ? "§aSkin changed to §f" + skinName + "§a."
+                                : "§cDancer §f" + dancerId + " §cnot found.");
+                openStaffDancer(p, dancerId);
+            });
         }
 
         @EventHandler

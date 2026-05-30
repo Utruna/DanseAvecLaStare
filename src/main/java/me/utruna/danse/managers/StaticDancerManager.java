@@ -715,12 +715,10 @@ public class StaticDancerManager {
             if (skin != null && !skin.isBlank()) {
                 final String fId = id, fStyle = style, fSkin = skin;
                 final double fScale = scale;
-                SkinService.fetchSkin(plugin, skin, profile ->
-                        Bukkit.getScheduler().runTask(plugin, () -> {
-                            spawnStaticDancer(fId, loc, fStyle, profile, fSkin);
-                            if (fScale != 1.0) setScale(fId, fScale);
-                        })
-                );
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    spawnStaticDancer(fId, loc, fStyle, null, fSkin);
+                    if (fScale != 1.0) setScale(fId, fScale);
+                });
             } else {
                 spawnStaticDancer(id, loc, style, null, null);
                 if (scale != 1.0) setScale(id, scale);

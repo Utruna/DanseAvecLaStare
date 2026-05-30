@@ -74,6 +74,7 @@ public class DanceMenuManager {
     void clearPlayer(UUID id) {
         navStack.remove(id);
         slotHandlers.remove(id);
+        playerPlaylistCtx.remove(id);
     }
 
     // ── Open helpers ──────────────────────────────────────────────────────
@@ -261,7 +262,7 @@ public class DanceMenuManager {
                         List.of("§7" + Bukkit.getOnlinePlayers().size() + " connecté(s)")),
                 null); // info only
 
-        register(inv, 25,
+        register(inv, 7,
             makeIcon(Material.COMPASS, "§bParamètres d'affichage",
                 List.of("§7Distance d'affichage des danseurs",
                     "§7Valeur actuelle: §f" + getConfiguredRenderRadius())),
@@ -861,14 +862,14 @@ public class DanceMenuManager {
         Inventory inv = beginOpen(viewer, 27,
                 "§eJoueur : " + target.getName(),
                 "staff_player:" + target.getUniqueId());
-        boolean dancing = dm.isDancing(target.getUniqueId());
+        String activeStyle = dm.getActiveDanceStyle(target.getUniqueId());
         String activePl = pm.getActivePlaylistForPlayer(target.getUniqueId());
 
         ItemStack head = makePlayerHead(target);
         ItemMeta hm = head.getItemMeta();
         if (hm != null) {
             hm.lore(List.of(
-                    LEGACY.deserialize("§7danse: §f" + (dancing ? "en cours" : "aucune")),
+                    LEGACY.deserialize("§7danse: §f" + (activeStyle != null ? activeStyle : "aucune")),
                     LEGACY.deserialize("§7playlist: §f" + (activePl != null ? activePl : "aucune"))));
             head.setItemMeta(hm);
         }
@@ -1175,7 +1176,8 @@ public class DanceMenuManager {
         SkullMeta meta = (SkullMeta) skull.getItemMeta();
         if (meta != null) {
             meta.setOwnerProfile(target.getPlayerProfile());
-            String status = dm.isDancing(target.getUniqueId()) ? "§7danse active" : "§7aucune danse";
+            String activeStyle = dm.getActiveDanceStyle(target.getUniqueId());
+            String status = activeStyle != null ? "§7" + activeStyle : "§7aucune danse";
             meta.displayName(LEGACY.deserialize("§e" + target.getName()));
             meta.lore(List.of(LEGACY.deserialize(status)));
             skull.setItemMeta(meta);

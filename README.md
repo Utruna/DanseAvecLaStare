@@ -98,3 +98,26 @@ Les danseurs statiques sont sauvegardés automatiquement et restaurés au redém
 
 Les styles de danse se définissent dans `config.yml` sans recompiler.
 Voir [`docs/static_dancers.md`](docs/static_dancers.md) pour les danseurs statiques et les chorégraphies, [`docs/playlists.md`](docs/playlists.md) pour le système de playlists, [`docs/menus.md`](docs/menus.md) pour la documentation des menus, et [`docs/BBMODEL_INTEGRATION.md`](docs/BBMODEL_INTEGRATION.md) pour l'intégration des modèles.
+
+---
+
+## Performance & limites
+
+### Danses concurrentes
+
+| Clé config | Défaut | Effet |
+|---|---|---|
+| `dance.maxConcurrent` | `500` | Nombre maximal de danses joueur actives simultanément. Chaque danse alloue 1 `Dummy`, 1 `ModeledEntity` et 1 `ActiveModel` dans ModelEngine. Dépasser cette limite retourne `§cTrop de danses actives, réessaie dans un moment.` au joueur. Mettre à `0` pour désactiver la limite. |
+
+### Récupération des skins (API Mojang)
+
+Les skins des joueurs hors ligne sont récupérés via l'API Mojang sur un pool de threads dédié. Les profils sont mis en cache pour la session et ne déclenchent qu'un seul appel Mojang par pseudo.
+
+| Clé config | Défaut | Effet |
+|---|---|---|
+| `skinFetcher.maxThreads` | `4` | Taille du pool de threads `DanseSkinFetcher-N`. Augmenter si de nombreux skins sont chargés simultanément au démarrage (danseurs statiques avec skin custom). |
+| `skinFetcher.timeoutSeconds` | `5` | Délai maximal d'attente d'une réponse Mojang. En cas de timeout, le skin est ignoré et un warning est logué. |
+
+### Danseurs statiques
+
+Tous les danseurs statiques et tous les groupes de chorégraphie partagent **une seule `BukkitTask`** (global tick à 1 tick/cycle) au lieu d'une tâche individuelle par danseur. Le nombre de tâches planifiées dans Bukkit est donc constant quelle que soit la quantité de NPCs.

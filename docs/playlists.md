@@ -106,6 +106,6 @@ playlists:
 - La durée d'une répétition est calculée via `BlueprintAnimation.getLength()` (retourne des secondes) × 20 → ticks.
 - Le `PlaylistRunner` enchaîne les pistes avec `BukkitScheduler.runTaskLater()` ; chaque transition planifie la piste suivante à la fin de la durée courante.
 - Pour les groupes, `changeGroupAnimation()` appelle `playAnimation()` sur tous les membres dans le même tick → synchronisation maintenue entre pistes.
-- Les tâches d'animation individuelle/groupe restent actives pendant la playlist (ME4 ne boucle pas nativement les animations — la tâche est nécessaire pour relancer l'anim si elle s'arrête entre deux checks).
+- **Pause/resume avec le global tick** : avant chaque changement d'animation, `PlaylistManager` appelle `pauseAnimationTask(id)` ou `pauseGroupTask(groupId)`. Ces méthodes **n'annulent plus de `BukkitTask`** — elles ajoutent l'ID dans un set de pause (`pausedDancers` ou `pausedGroups`) consulté par le `globalTask` de `StaticDancerManager` à chaque tick. `resumeAnimationTask` / `resumeGroupTask` retirent simplement l'ID du set. Cela évite la création et l'annulation répétées de tâches Bukkit lors des transitions.
 - Si une playlist en `loop` se termine, elle repart automatiquement depuis la première piste.
 - `/danse stop` arrête à la fois la playlist du joueur et sa danse ME4.

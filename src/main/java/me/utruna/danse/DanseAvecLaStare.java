@@ -8,6 +8,7 @@ import me.utruna.danse.managers.SkinService;
 import me.utruna.danse.managers.StaticDancerManager;
 import me.utruna.danse.menu.DanceMenuManager;
 import me.utruna.danse.menu.MenuListener;
+import me.utruna.danse.utils.DanseGuard;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -16,8 +17,13 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.profile.PlayerProfile;
+import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -46,6 +52,7 @@ public class DanseAvecLaStare extends JavaPlugin {
         saveDefaultConfig();
         updateConfigIfNeeded();
         reloadConfig();
+        SkinService.init(getConfig().getInt("skinFetcher.maxThreads", 4));
 
         danceManager = new DanceManager(this);
         staticDancerManager = new StaticDancerManager(this);
@@ -84,7 +91,16 @@ public class DanseAvecLaStare extends JavaPlugin {
                     base.add("playlist");
                     base.add("staff");
                     base.add("debug");
+                    base.add("preview");
+                    base.add("reload");
                     return base.stream()
+                            .filter(s -> s.toLowerCase().startsWith(partial))
+                            .collect(Collectors.toList());
+                }
+                // /danse preview <style>
+                if (args.length == 2 && args[0].equalsIgnoreCase("preview")) {
+                    String partial = args[1].toLowerCase();
+                    return danceManager.getStyleNames().stream()
                             .filter(s -> s.toLowerCase().startsWith(partial))
                             .collect(Collectors.toList());
                 }
@@ -311,6 +327,7 @@ public class DanseAvecLaStare extends JavaPlugin {
         if (danceManager != null) {
             danceManager.stopAll();
         }
+        SkinService.shutdown();
         getLogger().info("Arrêt du plugin de danse.");
     }
 
@@ -358,6 +375,35 @@ public class DanseAvecLaStare extends JavaPlugin {
             return true;
         }
 
+        // --- Reload configuration ---
+
+        if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
+            String adminNode = getConfig().getString("permissions.useAdmin", "danse.admin");
+            if (!DanseGuard.canUse(sender, adminNode, this)) {
+                sender.sendMessage("§cTu n'as pas la permission.");
+                return true;
+            }
+            try {
+                File configFile = new File(getDataFolder(), "config.yml");
+                String backupName = "config.yml." + LocalDateTime.now()
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm"));
+                if (configFile.exists()) {
+                    Files.copy(configFile.toPath(), new File(getDataFolder(), backupName).toPath(),
+                            StandardCopyOption.REPLACE_EXISTING);
+                }
+                reloadConfig();
+                updateConfigIfNeeded();
+                reloadConfig();
+                danceManager.reloadStyles();
+                SkinService.clearCache();
+                sender.sendMessage("§aConfiguration rechargée. §7Backup : §f" + backupName);
+            } catch (Exception ex) {
+                getLogger().log(Level.SEVERE, "Erreur lors du reload", ex);
+                sender.sendMessage("§cErreur lors du rechargement de la configuration.");
+            }
+            return true;
+        }
+
         // --- NPC : gestion des danseurs statiques ---
 
         if (args.length > 0 && args[0].equalsIgnoreCase("npc")) {
@@ -371,14 +417,20 @@ public class DanseAvecLaStare extends JavaPlugin {
         // --- Chorégraphie et playlists ---
 
         if (args.length > 0 && args[0].equalsIgnoreCase("choreo")) {
-            if (sender instanceof Player p && !p.hasPermission("danse.choreo")) {
-                p.sendMessage("§cVous n'avez pas la permission danse.choreo.");
+            String adminNode = getConfig().getString("permissions.useAdmin", "danse.admin");
+            if (!DanseGuard.canUse(sender, adminNode, this)) {
+                sender.sendMessage("§cTu n'as pas la permission.");
                 return true;
             }
             return handleChoreoCommand(sender, args);
         }
 
         if (args.length > 0 && args[0].equalsIgnoreCase("playlist")) {
+            String playlistNode = getConfig().getString("permissions.usePlaylist", "danse.playlist");
+            if (!DanseGuard.canUse(sender, playlistNode, this)) {
+                sender.sendMessage("§cTu n'as pas la permission.");
+                return true;
+            }
             return handlePlaylistCommand(sender, args);
         }
 
@@ -417,8 +469,19 @@ public class DanseAvecLaStare extends JavaPlugin {
             return true;
         }
 
+        if (!DanseGuard.isWorldAllowed(player, this)) {
+            player.sendMessage("§cTu ne peux pas danser dans ce monde.");
+            return true;
+        }
+
         if (!player.hasPermission("danse.player")) {
             player.sendMessage("§cVous n'avez pas la permission de base pour utiliser /danse.");
+            return true;
+        }
+
+        String useNode = getConfig().getString("permissions.useCommand", "danse.use");
+        if (!DanseGuard.canUse(player, useNode, this)) {
+            player.sendMessage("§cTu n'as pas la permission.");
             return true;
         }
 
@@ -437,6 +500,36 @@ public class DanseAvecLaStare extends JavaPlugin {
 
             if (args[0].equalsIgnoreCase("list")) {
                 player.sendMessage("§eStyles disponibles: §f" + String.join(", ", danceManager.getStyleNames()));
+                return true;
+            }
+
+            if (args[0].equalsIgnoreCase("preview")) {
+                if (args.length < 2) {
+                    player.sendMessage("§cUsage: §f/danse preview <style> [duréeTicks]");
+                    return true;
+                }
+                DanceStyle previewStyle = danceManager.parseStyle(args[1]);
+                if (previewStyle == null) {
+                    player.sendMessage("§cStyle inconnu. Utilisez §f/danse list§c pour la liste.");
+                    return true;
+                }
+                int duration;
+                if (args.length > 2) {
+                    try {
+                        duration = Integer.parseInt(args[2]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage("§cDurée invalide. Entrez un nombre entier de ticks.");
+                        return true;
+                    }
+                } else {
+                    duration = getConfig().getInt("preview.defaultDurationTicks", 100);
+                }
+                danceManager.startDancePreview(player, previewStyle);
+                BukkitTask task = Bukkit.getScheduler().runTaskLater(this,
+                        () -> danceManager.stopDance(player.getUniqueId()), duration);
+                danceManager.registerPreviewTask(player.getUniqueId(), task);
+                player.sendMessage("§aAperçu: §f" + previewStyle.getName()
+                        + "§a — arrêt dans §f" + duration + "§a ticks.");
                 return true;
             }
 

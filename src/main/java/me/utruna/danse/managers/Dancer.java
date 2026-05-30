@@ -34,4 +34,12 @@ public interface Dancer {
     /** Met à jour la distance d'affichage si l'implémentation le supporte. */
     default void setRenderRadius(int radius) {
     }
+
+    /**
+     * Change la visibilité du dummy pour son propriétaire.
+     * {@code true} → visible uniquement par le propriétaire (mode aperçu).
+     * {@code false} → caché au propriétaire (mode danse normal).
+     */
+    default void setOwnerCanSee(boolean canSee) {
+    }
 }

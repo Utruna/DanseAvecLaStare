@@ -76,13 +76,13 @@ dancers:
 
 1. `spawnStaticDancer()` crée un `Dummy<PlayerProfile>` avec orientation (`setYBodyRot` / `setYHeadRot`) appliquée immédiatement.
 2. L'`ActiveModel` est chargé via `createActiveModel(blueprintId)` en respectant `useFallbackMode`.
-3. Si un skin est fourni, `applySkinToModel()` applique la texture par réflexion sur les bones compatibles.
+3. Si un skin est fourni, `applySkinToModel()` applique la texture par réflexion sur les bones compatibles. Les méthodes `setTexture` trouvées sur chaque classe de behavior sont mises en cache statiquement dans `ModelEngineDancer` pour éviter les appels répétés à `getMethods()`.
 4. Si `scale != 1.0`, `activeModel.setScale(scale)` est appelé après le spawn.
-5. Une `BukkitTask` (1 tick) relance l'animation en boucle si elle s'arrête.
+5. **Le danseur est pris en charge par le global tick** — aucune `BukkitTask` individuelle n'est créée par danseur. Un unique `globalTask` (1 tick/cycle, démarré dans le constructeur de `StaticDancerManager`) itère sur tous les danseurs actifs et tous les groupes à chaque tick et relance les animations arrêtées.
 6. `saveDancer()` écrit la position, le style, le pseudo et l'échelle dans le YAML (`synchronized` pour les écritures concurrentes lors des fetch Mojang async).
 7. `moveStaticDancer()` met à jour `dummy.setLocation()` + `setYBodyRot/YHeadRot` et écrase l'entrée du fichier.
 8. `setScale()` appelle `activeModel.setScale()` et persiste la valeur ; l'échelle est aussi réappliquée dans `swapModel()` pour survivre aux changements d'animation.
-9. `changeDancerStyle()` met en pause la tâche d'animation (individuelle ou de groupe), appelle `changeAnimation()` puis relance la tâche et persiste le nouveau style dans le YAML.
+9. `changeDancerStyle()` suspend temporairement l'animation via `pausedDancers` / `pausedGroups` (voir ci-dessous), appelle `changeAnimation()` puis retire l'entrée de pause et persiste le nouveau style dans le YAML.
 
 ## Gestion des erreurs
 
@@ -130,6 +130,20 @@ groups:
 
 ### Comportement technique
 
-1. `createChoreography()` annule les tâches individuelles des danseurs concernés et lance une tâche partagée (1 tick).
-2. `syncAnimations()` arrête toutes les animations du groupe au même tick puis les redémarre simultanément (`lerpIn=0`, `lerpOut=0`).
-3. La tâche partagée surveille chaque membre et relance son animation si elle s'est arrêtée (boucle native ME4 non gérée).
+1. `createChoreography()` enregistre les membres dans `choreographyGroups`, retire chaque danseur de toute autre tâche individuelle (via `dancerToGroup`) et appelle `syncAnimations()`.
+2. `syncAnimations()` arrête toutes les animations du groupe au même tick puis les redémarre simultanément (`lerpIn=0`, `lerpOut=0`). C'est le seul point où la synchronisation est explicitement forcée.
+3. Le `globalTask` surveille chaque membre de chaque groupe actif et relance son animation si elle s'est arrêtée — aucune tâche partagée distincte n'existe par groupe.
+
+### Mécanisme de pause (interaction avec PlaylistManager)
+
+Pour permettre à `PlaylistManager` de changer l'animation d'un danseur ou d'un groupe sans conflit avec le global tick, deux sets de pause sont utilisés :
+
+| Set | Géré par | Effet sur le global tick |
+|---|---|---|
+| `pausedDancers` | `pauseAnimationTask(id)` / `resumeAnimationTask(id)` | Le global tick ignore les danseurs solo listés dans ce set |
+| `pausedGroups` | `pauseGroupTask(groupId)` / `resumeGroupTask(groupId)` | Le global tick ignore tous les membres des groupes listés dans ce set |
+
+Séquence typique dans `PlaylistManager` :
+1. `pauseAnimationTask(id)` → ajoute `id` à `pausedDancers`
+2. `changeAnimation(id, styleName)` → change l'animation (aucun conflit avec le tick)
+3. `resumeAnimationTask(id)` → retire `id` de `pausedDancers`, le global tick reprend la main

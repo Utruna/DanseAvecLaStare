@@ -11,6 +11,7 @@ import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.profile.PlayerProfile;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.Nullable;
@@ -21,18 +22,33 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
+/**
+ * Gère les danseurs statiques (NPCs ModelEngine positionnés dans le monde) et les groupes
+ * de chorégraphie.
+ *
+ * <p><b>Global tick :</b> un unique {@code BukkitTask} ({@code globalTask}, 1 tick/cycle) gère
+ * toutes les animations — aucune tâche individuelle par danseur ni par groupe. Il itère sur
+ * {@code activeDancers} (danseurs solo) et sur {@code choreographyGroups} (groupes) et relance
+ * les animations qui se sont arrêtées.
+ *
+ * <p><b>Pause/resume :</b> {@code pausedDancers} et {@code pausedGroups} sont deux sets consultés
+ * à chaque tick du global tick. Ajouter un ID à un set suspend son animation sans annuler de
+ * tâche Bukkit. {@link PlaylistManager} utilise ces sets via {@link #pauseAnimationTask} et
+ * {@link #pauseGroupTask} pour changer les animations sans conflit.
+ */
 public class StaticDancerManager {
 
     private final DanseAvecLaStare plugin;
     private final Map<String, StaticDancerEntry> activeDancers = new ConcurrentHashMap<>();
 
     // --- Chorégraphie ---
-    // groupId → set ordonné d'IDs de danseurs
     private final Map<String, Set<String>> choreographyGroups = new LinkedHashMap<>();
-    // groupId → tâche partagée du groupe
-    private final Map<String, BukkitTask> groupTasks = new ConcurrentHashMap<>();
-    // dancerId → groupId (lookup inverse)
-    private final Map<String, String> dancerToGroup = new ConcurrentHashMap<>();
+    private final Map<String, String>      dancerToGroup       = new ConcurrentHashMap<>();
+
+    // --- Tick global ---
+    private BukkitTask globalTask;
+    private final Set<String> pausedDancers = new HashSet<>();
+    private final Set<String> pausedGroups  = new HashSet<>();
 
     private static class StaticDancerEntry {
         @SuppressWarnings("deprecation")
@@ -52,6 +68,7 @@ public class StaticDancerManager {
 
     public StaticDancerManager(DanseAvecLaStare plugin) {
         this.plugin = plugin;
+        globalTask = Bukkit.getScheduler().runTaskTimer(plugin, this::globalTick, 1L, 1L);
     }
 
     // -------------------------------------------------------------------------
@@ -130,11 +147,7 @@ public class StaticDancerManager {
             entry.skinName = skinName;
             entry.location = location.clone();
 
-            // Si ce danseur appartient déjà à un groupe (chargé depuis choreography.yml),
-            // on ne démarre pas de tâche individuelle — le groupe s'en chargera.
-            if (!dancerToGroup.containsKey(id)) {
-                entry.task = startAnimationLoop(entry);
-            }
+            // Le global tick gère toutes les animations (individuel et groupe).
 
             activeDancers.put(id, entry);
             saveDancer(id, entry);
@@ -161,8 +174,7 @@ public class StaticDancerManager {
             if (groupIds != null) {
                 groupIds.remove(id);
                 if (groupIds.isEmpty()) {
-                    BukkitTask old = groupTasks.remove(groupId);
-                    if (old != null) old.cancel();
+                    pausedGroups.remove(groupId);
                     choreographyGroups.remove(groupId);
                     saveChoreography();
                 }
@@ -354,10 +366,9 @@ public class StaticDancerManager {
     }
 
     public void removeAll() {
-        for (BukkitTask task : groupTasks.values()) {
-            if (task != null) task.cancel();
-        }
-        groupTasks.clear();
+        if (globalTask != null) { globalTask.cancel(); globalTask = null; }
+        pausedDancers.clear();
+        pausedGroups.clear();
         choreographyGroups.clear();
         dancerToGroup.clear();
 
@@ -398,17 +409,10 @@ public class StaticDancerManager {
             if (oldGroup != null && !oldGroup.equals(groupId)) {
                 disbandGroupInternal(oldGroup);
             }
-            // Annuler la tâche individuelle
-            StaticDancerEntry entry = activeDancers.get(id);
-            if (entry != null && entry.task != null) {
-                entry.task.cancel();
-                entry.task = null;
-            }
             dancerToGroup.put(id, groupId);
         }
 
-        BukkitTask task = startGroupTask(groupId);
-        groupTasks.put(groupId, task);
+        syncAnimations(groupId);
         saveChoreography();
         return true;
     }
@@ -430,20 +434,9 @@ public class StaticDancerManager {
             removeFromChoreography(oldGroup, dancerId);
         }
 
-        // Annuler la tâche individuelle
-        StaticDancerEntry entry = activeDancers.get(dancerId);
-        if (entry != null && entry.task != null) {
-            entry.task.cancel();
-            entry.task = null;
-        }
-
         ids.add(dancerId);
         dancerToGroup.put(dancerId, groupId);
-
-        // Re-démarrer la tâche de groupe avec re-synchronisation
-        BukkitTask old = groupTasks.remove(groupId);
-        if (old != null) old.cancel();
-        groupTasks.put(groupId, startGroupTask(groupId));
+        syncAnimations(groupId);
         saveChoreography();
         return true;
     }
@@ -460,15 +453,8 @@ public class StaticDancerManager {
         ids.remove(dancerId);
         dancerToGroup.remove(dancerId);
 
-        // Restaurer la tâche individuelle
-        StaticDancerEntry entry = activeDancers.get(dancerId);
-        if (entry != null) {
-            entry.task = startAnimationLoop(entry);
-        }
-
         if (ids.isEmpty()) {
-            BukkitTask old = groupTasks.remove(groupId);
-            if (old != null) old.cancel();
+            pausedGroups.remove(groupId);
             choreographyGroups.remove(groupId);
         }
 
@@ -484,9 +470,7 @@ public class StaticDancerManager {
     public boolean syncChoreography(String groupId) {
         if (!choreographyGroups.containsKey(groupId)) return false;
 
-        BukkitTask old = groupTasks.remove(groupId);
-        if (old != null) old.cancel();
-        groupTasks.put(groupId, startGroupTask(groupId));
+        syncAnimations(groupId);
         return true;
     }
 
@@ -501,15 +485,10 @@ public class StaticDancerManager {
 
         if (playlistManager != null) playlistManager.onGroupDeleted(groupId);
 
-        BukkitTask old = groupTasks.remove(groupId);
-        if (old != null) old.cancel();
-
+        pausedGroups.remove(groupId);
         for (String id : ids) {
             dancerToGroup.remove(id);
-            StaticDancerEntry entry = activeDancers.get(id);
-            if (entry != null) {
-                entry.task = startAnimationLoop(entry);
-            }
+            pausedDancers.remove(id);
         }
 
         saveChoreography();
@@ -532,7 +511,8 @@ public class StaticDancerManager {
      * un spawn packet frais — un simple registerSelf() peut laisser l'ActiveModel détaché côté ME4,
      * ce qui provoque la disparition du modèle à la fin de l'animation en cours.
      */
-    public void refreshAll() {
+    /** Respawn propre des danseurs pour envoyer les packets de spawn au joueur entrant. */
+    public void refreshForPlayer(Player player) {
         for (Map.Entry<String, StaticDancerEntry> mapEntry : new ArrayList<>(activeDancers.entrySet())) {
             String id = mapEntry.getKey();
             StaticDancerEntry entry = mapEntry.getValue();
@@ -543,7 +523,7 @@ public class StaticDancerManager {
                             entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
                 }
             } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshAll pour '" + id + "'", e);
+                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshForPlayer pour '" + id + "'", e);
             }
         }
     }
@@ -618,28 +598,31 @@ public class StaticDancerManager {
      * Annule la tâche d'animation individuelle du danseur sans le détruire.
      * Appelé par PlaylistManager quand il prend le contrôle des animations.
      */
+    /**
+     * Suspend temporairement l'animation du danseur dans le global tick.
+     * Ajoute {@code id} à {@code pausedDancers} ; le global tick ignorera ce danseur
+     * jusqu'à ce que {@link #resumeAnimationTask(String)} soit appelé.
+     * N'annule aucune tâche Bukkit.
+     */
     public void pauseAnimationTask(String id) {
-        StaticDancerEntry entry = activeDancers.get(id);
-        if (entry != null && entry.task != null) {
-            entry.task.cancel();
-            entry.task = null;
-            dbg("pauseAnimationTask('" + id + "') → tâche annulée");
-        } else {
-            dbg("pauseAnimationTask('" + id + "') → rien à annuler");
-        }
+        pausedDancers.add(id);
+        dbg("pauseAnimationTask('" + id + "') → marqué en pause");
     }
 
     /**
      * Relance la tâche d'animation individuelle (danseur hors groupe uniquement).
      * Appelé par PlaylistManager quand il rend le contrôle.
      */
+    /**
+     * Reprend l'animation du danseur dans le global tick.
+     * Retire {@code id} de {@code pausedDancers} ; le global tick reprend la main au tick suivant.
+     */
     public void resumeAnimationTask(String id) {
-        StaticDancerEntry entry = activeDancers.get(id);
-        if (entry != null && entry.task == null && !dancerToGroup.containsKey(id)) {
-            entry.task = startAnimationLoop(entry);
-            dbg("resumeAnimationTask('" + id + "') → tâche relancée (anim='" + entry.resolvedAnimation + "')");
+        if (activeDancers.containsKey(id)) {
+            pausedDancers.remove(id);
+            dbg("resumeAnimationTask('" + id + "') → démarqué");
         } else {
-            dbg("resumeAnimationTask('" + id + "') → ignoré (entry=" + (entry != null) + " taskNull=" + (entry != null && entry.task == null) + " inGroup=" + dancerToGroup.containsKey(id) + ")");
+            dbg("resumeAnimationTask('" + id + "') → ignoré (danseur inexistant)");
         }
     }
 
@@ -647,38 +630,30 @@ public class StaticDancerManager {
      * Annule la tâche partagée du groupe sans dissoudre le groupe.
      * Appelé par PlaylistManager pour éviter les conflits avec ses propres transitions.
      */
+    /**
+     * Suspend temporairement l'animation de tous les membres du groupe dans le global tick.
+     * Ajoute {@code groupId} à {@code pausedGroups} sans dissoudre le groupe ni annuler de tâche.
+     */
     public void pauseGroupTask(String groupId) {
-        BukkitTask task = groupTasks.remove(groupId);
-        if (task != null) {
-            task.cancel();
-            dbg("pauseGroupTask('" + groupId + "') → tâche annulée");
-        } else {
-            dbg("pauseGroupTask('" + groupId + "') → aucune tâche active");
-        }
+        pausedGroups.add(groupId);
+        dbg("pauseGroupTask('" + groupId + "') → marqué en pause");
     }
 
     /**
      * Relance la tâche partagée du groupe SANS re-synchroniser les animations.
      * Appelé par PlaylistManager quand il rend le contrôle du groupe.
      */
+    /**
+     * Reprend l'animation du groupe dans le global tick sans re-synchroniser.
+     * Retire {@code groupId} de {@code pausedGroups} ; le global tick reprend la main au tick suivant.
+     */
     public void resumeGroupTask(String groupId) {
-        if (!choreographyGroups.containsKey(groupId) || groupTasks.containsKey(groupId)) {
-            dbg("resumeGroupTask('" + groupId + "') → ignoré (existe=" + choreographyGroups.containsKey(groupId) + " déjàActif=" + groupTasks.containsKey(groupId) + ")");
+        if (!choreographyGroups.containsKey(groupId)) {
+            dbg("resumeGroupTask('" + groupId + "') → ignoré (groupe inexistant)");
             return;
         }
-        BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            Set<String> ids = choreographyGroups.get(groupId);
-            if (ids == null) return;
-            for (String id : ids) {
-                StaticDancerEntry entry = activeDancers.get(id);
-                if (entry == null || entry.activeModel == null || entry.resolvedAnimation == null) continue;
-                if (!entry.activeModel.getAnimationHandler().isPlayingAnimation(entry.resolvedAnimation)) {
-                    entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.1, 0.1, 1.0, true);
-                }
-            }
-        }, 1L, 1L);
-        groupTasks.put(groupId, task);
-        dbg("resumeGroupTask('" + groupId + "') → tâche relancée sans re-sync");
+        pausedGroups.remove(groupId);
+        dbg("resumeGroupTask('" + groupId + "') → démarqué");
     }
 
     // -------------------------------------------------------------------------
@@ -845,33 +820,6 @@ public class StaticDancerManager {
     // Internals
     // -------------------------------------------------------------------------
 
-    private BukkitTask startAnimationLoop(StaticDancerEntry entry) {
-        return Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (entry.resolvedAnimation == null || entry.activeModel == null) return;
-            if (!entry.activeModel.getAnimationHandler().isPlayingAnimation(entry.resolvedAnimation)) {
-                entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.1, 0.1, 1.0, true);
-            }
-        }, 0L, 1L);
-    }
-
-    /**
-     * Démarre la tâche partagée d'un groupe après avoir synchronisé immédiatement toutes les animations.
-     */
-    private BukkitTask startGroupTask(String groupId) {
-        syncAnimations(groupId);
-        return Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            Set<String> ids = choreographyGroups.get(groupId);
-            if (ids == null) return;
-            for (String id : ids) {
-                StaticDancerEntry entry = activeDancers.get(id);
-                if (entry == null || entry.activeModel == null || entry.resolvedAnimation == null) continue;
-                if (!entry.activeModel.getAnimationHandler().isPlayingAnimation(entry.resolvedAnimation)) {
-                    entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.1, 0.1, 1.0, true);
-                }
-            }
-        }, 1L, 1L);
-    }
-
     /**
      * Arrête toutes les animations du groupe puis les redémarre au même tick (tick 0 partagé).
      * fadeIn=0 pour éviter tout blend et repartir exactement depuis la frame 0.
@@ -964,15 +912,36 @@ public class StaticDancerManager {
         }
     }
 
-    /** Dissout un groupe sans sauvegarder : annule la tâche et retire les membres de dancerToGroup. */
+    /** Dissout un groupe sans sauvegarder : retire les membres de dancerToGroup. */
     private void disbandGroupInternal(String groupId) {
         Set<String> ids = choreographyGroups.remove(groupId);
-        BukkitTask old = groupTasks.remove(groupId);
-        if (old != null) old.cancel();
+        pausedGroups.remove(groupId);
         if (ids != null) {
             for (String id : ids) {
                 dancerToGroup.remove(id);
             }
+        }
+    }
+
+    private void globalTick() {
+        for (Map.Entry<String, StaticDancerEntry> e : activeDancers.entrySet()) {
+            String id = e.getKey();
+            if (dancerToGroup.containsKey(id) || pausedDancers.contains(id)) continue;
+            tickEntry(e.getValue());
+        }
+        for (Map.Entry<String, Set<String>> g : choreographyGroups.entrySet()) {
+            if (pausedGroups.contains(g.getKey())) continue;
+            for (String memberId : g.getValue()) {
+                StaticDancerEntry entry = activeDancers.get(memberId);
+                if (entry != null) tickEntry(entry);
+            }
+        }
+    }
+
+    private void tickEntry(StaticDancerEntry entry) {
+        if (entry.resolvedAnimation == null || entry.activeModel == null) return;
+        if (!entry.activeModel.getAnimationHandler().isPlayingAnimation(entry.resolvedAnimation)) {
+            entry.activeModel.getAnimationHandler().playAnimation(entry.resolvedAnimation, 0.1, 0.1, 1.0, true);
         }
     }
 

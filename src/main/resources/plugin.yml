@@ -7,7 +7,7 @@ softdepend: [ModelEngine]
 commands:
   danse:
     description: Lance ou arrête une danse
-    usage: /danse [style|npc <spawn|move|delete|list|highlight|resize|style>|choreo|playlist|list|stop|debug]
+    usage: /danse [style|preview <style>|npc <spawn|move|delete|list|highlight|resize|style>|choreo|playlist|list|stop|reload|debug]
 
 permissions:
   danse.player:
@@ -31,6 +31,12 @@ permissions:
   danse.staff:
     description: Accès au menu staff (gestion NPCs, playlists, chorégraphies)
     default: false
+  danse.use:
+    description: Utiliser les commandes joueur (styles, stop, list, preview)
+    default: true
+  danse.admin:
+    description: Commandes admin (reload, choreo)
+    default: op
   danse.debug:
     description: Accès aux commandes de diagnostic
     default: false
@@ -52,4 +58,6 @@ permissions:
       danse.playlist: true
       danse.playlist.play: true
       danse.debug: true
+      danse.use: true
+      danse.admin: true
       danse.style: true

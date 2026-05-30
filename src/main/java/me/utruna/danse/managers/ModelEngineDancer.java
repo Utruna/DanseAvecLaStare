@@ -9,9 +9,10 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.profile.PlayerProfile;
 
-import java.util.ArrayList;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Implémentation {@link Dancer} basée sur ModelEngine 4.0.9.
@@ -20,6 +21,14 @@ import java.util.List;
  * avec plusieurs builds de ModelEngine sans recompilation.
  */
 public class ModelEngineDancer implements Dancer {
+
+    /**
+     * Cache statique partagé entre toutes les instances : classe du behavior ME4 →
+     * liste des méthodes {@code setTexture(X)} à 1 paramètre.
+     * Peuplé au premier spawn de chaque type de behavior ; jamais invalidé en cours de
+     * session (les classes ME4 ne changent pas sans redémarrage du serveur).
+     */
+    private static final ConcurrentHashMap<Class<?>, List<Method>> SET_TEXTURE_CACHE = new ConcurrentHashMap<>();
 
     private final DanseAvecLaStare plugin;
     private final String modelId;
@@ -168,25 +177,23 @@ public class ModelEngineDancer implements Dancer {
     }
 
     private boolean applyTextureToBehavior(Object behavior) {
-        if (behavior == null) {
-            return false;
-        }
+        if (behavior == null) return false;
 
-        Method[] methods = behavior.getClass().getMethods();
-        for (Method method : methods) {
-            if (!method.getName().equals("setTexture") || method.getParameterCount() != 1) {
-                continue;
+        List<Method> methods = SET_TEXTURE_CACHE.computeIfAbsent(behavior.getClass(), cls -> {
+            List<Method> found = new ArrayList<>();
+            for (Method m : cls.getMethods()) {
+                if (m.getName().equals("setTexture") && m.getParameterCount() == 1) found.add(m);
             }
+            return found;
+        });
 
+        for (Method method : methods) {
             Class<?> parameterType = method.getParameterTypes()[0];
             try {
-                // Priorité au skinProfile fourni (profil du joueur ciblé, pas forcément owner)
                 if (skinProfile != null && parameterType.isInstance(skinProfile)) {
                     method.invoke(behavior, skinProfile);
                     return true;
                 }
-
-                // Fallback : passer le joueur directement si le behavior l'accepte
                 if (owner != null && Player.class.isAssignableFrom(parameterType)) {
                     method.invoke(behavior, owner);
                     return true;
@@ -195,7 +202,6 @@ public class ModelEngineDancer implements Dancer {
                 debugWarn("    ✗ setTexture failed on " + behavior.getClass().getSimpleName() + " : " + ex.getClass().getSimpleName() + " - " + ex.getMessage());
             }
         }
-
         return false;
     }
 
@@ -318,6 +324,16 @@ public class ModelEngineDancer implements Dancer {
         this.renderRadius = Math.max(1, radius);
         if (dummy != null) {
             dummy.setRenderRadius(this.renderRadius);
+        }
+    }
+
+    @Override
+    public void setOwnerCanSee(boolean canSee) {
+        if (dummy == null || owner == null) return;
+        if (canSee) {
+            dummy.getData().getTracked().setPlayerPredicate(p -> p.getUniqueId().equals(owner.getUniqueId()));
+        } else {
+            dummy.getData().getTracked().setPlayerPredicate(p -> !p.getUniqueId().equals(owner.getUniqueId()));
         }
     }
 }

@@ -7,8 +7,8 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests unitaires pour GenericDanceStyle.
- * La classe est dans le même package (src/test), ce qui rend normalizeYaw (protected) accessible.
+ * Unit tests for GenericDanceStyle.
+ * The class is in the same package (src/test), which makes normalizeYaw (protected) accessible.
  */
 class GenericDanceStyleTest {
 
@@ -57,14 +57,14 @@ class GenericDanceStyleTest {
 
     @Test
     void normalizeYaw_540_loopsTwiceToNegative180() {
-        // 540 - 360 = 180 (encore ≥ 180) → 180 - 360 = -180
-        // L'intervalle cible est [-180, 180) : 180 lui-même est exclu et ramené à -180.
+        // 540 - 360 = 180 (still >= 180) -> 180 - 360 = -180
+        // The target interval is [-180, 180): 180 itself is excluded and mapped to -180.
         assertEquals(-180f, staticStyle.normalizeYaw(540f), DELTA);
     }
 
     @Test
     void normalizeYaw_negative180_isStable() {
-        // La condition est yaw < -180, donc -180 ne déclenche pas la boucle
+        // The condition is yaw < -180, so -180 does not trigger the loop
         assertEquals(-180f, staticStyle.normalizeYaw(-180f), DELTA);
     }
 
@@ -82,7 +82,7 @@ class GenericDanceStyleTest {
 
     @Test
     void normalizeYaw_negative540_mapsToNegative180() {
-        // -540 + 360 = -180 ; -180 < -180 ? Non → s'arrête
+        // -540 + 360 = -180; -180 < -180? No -> stop
         assertEquals(-180f, staticStyle.normalizeYaw(-540f), DELTA);
     }
 
@@ -127,14 +127,14 @@ class GenericDanceStyleTest {
 
     @Test
     void dynamic_yawAtTick0_equalsOriginYaw() {
-        // phase = 0 * 0.15 = 0 ; Math.sin(0) = 0 → aucun offset
+        // phase = 0 * 0.15 = 0; Math.sin(0) = 0 -> no offset
         Location origin = new Location(null, 0.0, 64.0, 0.0, 30.0f, 0.0f);
         assertEquals(origin.getYaw(), dynamicStyle.computeLocation(origin, 0).getYaw(), DELTA);
     }
 
     @Test
     void dynamic_yawAtTick10_differFromOriginYaw() {
-        // phase = 1.5 ; Math.sin(1.5) ≈ 0.997 → offset ≈ +39.9°
+        // phase = 1.5; Math.sin(1.5) ≈ 0.997 -> offset ≈ +39.9°
         Location origin = new Location(null, 0.0, 64.0, 0.0, 0.0f, 0.0f);
         float resultYaw = dynamicStyle.computeLocation(origin, 10).getYaw();
         assertNotEquals(origin.getYaw(), resultYaw, DELTA);
@@ -142,7 +142,7 @@ class GenericDanceStyleTest {
 
     @Test
     void dynamic_yawAlwaysInRange_withHighStartYaw() {
-        // Yaw de départ à 170 pour forcer le dépassement de borne sur le positif
+        // Start yaw at 170 to force an upper-bound overflow on the positive side
         Location origin = new Location(null, 0.0, 64.0, 0.0, 170.0f, 0.0f);
 
         for (int tick = 0; tick <= 100; tick++) {
@@ -192,7 +192,7 @@ class GenericDanceStyleTest {
 
     @Test
     void getPattern_staticModePreservesPatternAsLowercase() {
-        // Le constructeur applique toLowerCase() sur le pattern
+        // The constructor applies toLowerCase() to the pattern
         GenericDanceStyle s = new GenericDanceStyle("x", true, "CIRCLE", 0, 0);
         assertEquals("circle", s.getPattern());
     }

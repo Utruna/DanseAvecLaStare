@@ -13,17 +13,17 @@ import java.util.*;
 import java.util.logging.Level;
 
 /**
- * Gère les playlists de danses : séquences ordonnées de styles avec une durée par piste.
+ * Manages dance playlists: ordered sequences of styles with a duration per track.
  *
- * <p>Une playlist peut être jouée pour :
+ * <p>A playlist can be played for:
  * <ul>
- *   <li>Un <b>joueur</b> : change son style de danse à chaque piste.</li>
- *   <li>Un <b>danseur statique</b> : change son animation à chaque piste.</li>
- *   <li>Un <b>groupe de chorégraphie</b> : change l'animation de tous les membres
- *       simultanément (synchronisation maintenue).</li>
+ *   <li>A <b>player</b>: changes their dance style per track.</li>
+ *   <li>A <b>static dancer</b>: changes its animation per track.</li>
+ *   <li>A <b>choreography group</b>: changes all members' animations
+ *       simultaneously (synchronization preserved).</li>
  * </ul>
  *
- * Les playlists sont persistées dans {@code playlists.yml}.
+ * Playlists are persisted in {@code playlists.yml}.
  */
 public class PlaylistManager {
 
@@ -31,29 +31,29 @@ public class PlaylistManager {
     private final DanceManager danceManager;
     private final StaticDancerManager staticDancerManager;
 
-    // Playlists définies (persistées)
+    // Defined playlists (persisted)
     private final Map<String, Playlist> playlists = new LinkedHashMap<>();
 
-    // Runners actifs par type de cible
+    // Active runners by target type
     private final Map<UUID, PlaylistRunner>   playerRunners = new HashMap<>();
     private final Map<String, PlaylistRunner> dancerRunners = new HashMap<>();
     private final Map<String, PlaylistRunner> groupRunners  = new HashMap<>();
 
     // -------------------------------------------------------------------------
-    // Modèles de données
+    // Data models
     // -------------------------------------------------------------------------
 
     /**
-     * Une piste d'une playlist : un style et le nombre de fois que l'animation doit jouer
-     * avant de passer à la piste suivante.
-     * La durée réelle est calculée automatiquement depuis le blueprint ModelEngine.
+    * A playlist track: a style and how many times the animation should play
+    * before moving to the next track.
+    * The real duration is derived from the ModelEngine blueprint.
      */
     public record Track(String styleName, int repetitions) {}
 
-    /** Durée par défaut d'une répétition (ticks) si le blueprint est inaccessible. */
+    /** Default duration per repetition (ticks) if the blueprint is unavailable. */
     private static final int DEFAULT_TICKS_PER_REP = 40;
 
-    /** Active les logs de debug pour le système de playlist. */
+    /** Enables debug logs for the playlist system. */
     private boolean debugEnabled = false;
 
     private void dbg(String msg) {
@@ -62,12 +62,12 @@ public class PlaylistManager {
 
     public void setDebugEnabled(boolean enabled) {
         this.debugEnabled = enabled;
-        plugin.getLogger().info("[Playlist] Debug " + (enabled ? "activé" : "désactivé") + ".");
+        plugin.getLogger().info("[Playlist] Debug " + (enabled ? "enabled" : "disabled") + ".");
     }
 
     public boolean isDebugEnabled() { return debugEnabled; }
 
-    /** Définition d'une playlist. Immuable ; modifié par remplacement dans la map. */
+    /** Playlist definition. Immutable; modified by replacing the map entry. */
     public static class Playlist {
         public final String id;
         public final List<Track> tracks;
@@ -80,7 +80,7 @@ public class PlaylistManager {
         }
     }
 
-    /** État d'exécution d'une playlist sur une cible donnée. */
+    /** Execution state of a playlist on a given target. */
     private static class PlaylistRunner {
         String    playlistId;
         int       currentIndex;
@@ -104,10 +104,10 @@ public class PlaylistManager {
     // -------------------------------------------------------------------------
 
     /**
-     * Crée une nouvelle playlist vide.
-     *
-     * @param loop  {@code true} = boucle infinie, {@code false} = s'arrête après la dernière piste
-     * @return {@code false} si l'ID est déjà utilisé
+    * Creates a new empty playlist.
+    *
+    * @param loop  {@code true} = infinite loop, {@code false} = stops after last track
+    * @return {@code false} if the id is already used
      */
     public boolean createPlaylist(String id, boolean loop) {
         if (playlists.containsKey(id)) return false;
@@ -117,9 +117,9 @@ public class PlaylistManager {
     }
 
     /**
-     * Ajoute une piste en fin de playlist.
-     *
-     * @return {@code false} si la playlist n'existe pas ou si le style est inconnu
+    * Adds a track to the end of a playlist.
+    *
+    * @return {@code false} if the playlist doesn't exist or the style is unknown
      */
     public boolean addTrack(String id, String styleName, int durationTicks) {
         Playlist p = playlists.get(id);
@@ -135,9 +135,9 @@ public class PlaylistManager {
     }
 
     /**
-     * Supprime la piste à l'index donné (0-based).
-     *
-     * @return {@code false} si la playlist ou l'index sont invalides
+    * Removes the track at the given index (0-based).
+    *
+    * @return {@code false} if the playlist or index are invalid
      */
     public boolean removeTrack(String id, int index) {
         Playlist p = playlists.get(id);
@@ -152,9 +152,9 @@ public class PlaylistManager {
     }
 
     /**
-     * Supprime une playlist et stoppe tous ses runners actifs.
-     *
-     * @return {@code false} si la playlist n'existe pas
+    * Deletes a playlist and stops all its active runners.
+    *
+    * @return {@code false} if the playlist doesn't exist
      */
     public boolean deletePlaylist(String id) {
         if (!playlists.containsKey(id)) return false;
@@ -173,13 +173,13 @@ public class PlaylistManager {
     }
 
     // -------------------------------------------------------------------------
-    // Play / Stop — joueur
+    // Play / Stop — player
     // -------------------------------------------------------------------------
 
     /**
-     * Lance une playlist pour un joueur.
-     *
-     * @return {@code false} si la playlist est introuvable, vide, ou le joueur hors ligne
+    * Starts a playlist for a player.
+    *
+    * @return {@code false} if the playlist is missing, empty, or the player is offline
      */
     public boolean playForPlayer(UUID playerId, String playlistId) {
         Playlist p = playlists.get(playlistId);
@@ -211,13 +211,13 @@ public class PlaylistManager {
     }
 
     // -------------------------------------------------------------------------
-    // Play / Stop — danseur statique
+    // Play / Stop — static dancer
     // -------------------------------------------------------------------------
 
     /**
-     * Lance une playlist pour un danseur statique.
-     *
-     * @return {@code false} si la playlist ou le danseur est introuvable / vide
+    * Starts a playlist for a static dancer.
+    *
+    * @return {@code false} if the playlist or dancer is missing/empty
      */
     public boolean playForDancer(String dancerId, String playlistId) {
         Playlist p = playlists.get(playlistId);
@@ -231,22 +231,22 @@ public class PlaylistManager {
         dancerRunners.put(dancerId, runner);
 
         Track first = p.tracks.get(0);
-        dbg("playForDancer(" + dancerId + ") → playlist='" + playlistId + "' piste#0='" + first.styleName() + "' ×" + first.repetitions() + " délai=" + computeDelay(first) + " ticks");
+        dbg("playForDancer(" + dancerId + ") -> playlist='" + playlistId + "' track#0='" + first.styleName() + "' x" + first.repetitions() + " delay=" + computeDelay(first) + " ticks");
         staticDancerManager.changeAnimation(dancerId, first.styleName());
         scheduleDancerNext(dancerId, runner, p);
         return true;
     }
 
     /**
-     * Stoppe la playlist en cours pour un danseur statique.
+     * Stops the playlist running for a static dancer.
      *
-     * @return {@code false} si aucune playlist n'était active
+     * @return {@code false} if no playlist was active
      */
     public boolean stopForDancer(String dancerId) {
         PlaylistRunner runner = dancerRunners.remove(dancerId);
         if (runner == null) return false;
         cancelTask(runner);
-        dbg("stopForDancer(" + dancerId + ") → playlist arrêtée");
+        dbg("stopForDancer(" + dancerId + ") -> playlist stopped");
         return true;
     }
 
@@ -258,7 +258,7 @@ public class PlaylistManager {
      * Lance une playlist pour un groupe de chorégraphie.
      * Les animations de tous les membres du groupe changent simultanément à chaque piste.
      *
-     * @return {@code false} si la playlist ou le groupe est introuvable / vide
+    * @return {@code false} if the playlist or the group is missing/empty
      */
     public boolean playForGroup(String groupId, String playlistId) {
         Playlist p = playlists.get(playlistId);
@@ -272,7 +272,7 @@ public class PlaylistManager {
         groupRunners.put(groupId, runner);
 
         Track first = p.tracks.get(0);
-        dbg("playForGroup(" + groupId + ") → playlist='" + playlistId + "' piste#0='" + first.styleName() + "' ×" + first.repetitions() + " délai=" + computeDelay(first) + " ticks");
+        dbg("playForGroup(" + groupId + ") -> playlist='" + playlistId + "' track#0='" + first.styleName() + "' x" + first.repetitions() + " delay=" + computeDelay(first) + " ticks");
         staticDancerManager.changeGroupAnimation(groupId, first.styleName());
         scheduleGroupNext(groupId, runner, p);
         return true;
@@ -287,7 +287,7 @@ public class PlaylistManager {
         PlaylistRunner runner = groupRunners.remove(groupId);
         if (runner == null) return false;
         cancelTask(runner);
-        dbg("stopForGroup(" + groupId + ") → playlist arrêtée");
+        dbg("stopForGroup(" + groupId + ") -> playlist stopped");
         return true;
     }
 
@@ -397,7 +397,7 @@ public class PlaylistManager {
         }
 
         if (loaded > 0) {
-            plugin.getLogger().info("[Playlist] " + loaded + " playlist(s) chargée(s).");
+            plugin.getLogger().info("[Playlist] " + loaded + " playlist(s) loaded.");
         }
     }
 
@@ -419,7 +419,7 @@ public class PlaylistManager {
         try {
             yaml.save(file);
         } catch (IOException e) {
-            plugin.getLogger().log(Level.WARNING, "[Playlist] Impossible de sauvegarder playlists.yml", e);
+            plugin.getLogger().log(Level.WARNING, "[Playlist] Failed to save playlists.yml", e);
         }
     }
 
@@ -546,7 +546,7 @@ public class PlaylistManager {
     private void scheduleDancerNext(String dancerId, PlaylistRunner runner, Playlist playlist) {
         Track current = playlist.tracks.get(runner.currentIndex);
         long delay = computeDelay(current);
-        dbg("scheduleDancerNext(" + dancerId + ") piste#" + runner.currentIndex + "='" + current.styleName() + "' → prochain dans " + delay + " ticks");
+        dbg("scheduleDancerNext(" + dancerId + ") track#" + runner.currentIndex + "='" + current.styleName() + "' -> next in " + delay + " ticks");
         runner.task = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!dancerRunners.containsKey(dancerId)) return;
             if (!staticDancerManager.getDancerIds().contains(dancerId)) {
@@ -560,13 +560,13 @@ public class PlaylistManager {
                     runner.currentIndex = 0;
                 } else {
                     dancerRunners.remove(dancerId);
-                    dbg("Playlist dancer '" + dancerId + "' terminée (pas de boucle).");
+                    dbg("Playlist dancer '" + dancerId + "' finished (no loop).");
                     return;
                 }
             }
 
             Track next = playlist.tracks.get(runner.currentIndex);
-            dbg("transition dancer '" + dancerId + "' → piste#" + runner.currentIndex + "='" + next.styleName() + "'");
+            dbg("transition dancer '" + dancerId + "' -> track#" + runner.currentIndex + "='" + next.styleName() + "'");
             staticDancerManager.changeAnimation(dancerId, next.styleName());
             scheduleDancerNext(dancerId, runner, playlist);
         }, delay);
@@ -589,7 +589,7 @@ public class PlaylistManager {
                     runner.currentIndex = 0;
                 } else {
                     groupRunners.remove(groupId);
-                    dbg("Playlist groupe '" + groupId + "' terminée (pas de boucle).");
+                    dbg("Playlist group '" + groupId + "' finished (no loop).");
                     return;
                 }
             }
@@ -602,13 +602,13 @@ public class PlaylistManager {
     }
 
     /**
-     * Calcule le délai réel en ticks pour une piste : durée d'une répétition × nombre de répétitions.
-     * La durée est lue depuis le blueprint ModelEngine ; si indisponible, on utilise le fallback.
+     * Computes the real delay in ticks for a track: animation length × repetitions.
+     * The duration is read from the ModelEngine blueprint; if unavailable, the fallback is used.
      */
     private long computeDelay(Track track) {
         int animLength = resolveAnimationLengthTicks(track.styleName());
         long delay = (long) animLength * track.repetitions();
-        dbg("computeDelay('" + track.styleName() + "') → longueurAnim=" + animLength + " ticks × " + track.repetitions() + " rép. = " + delay + " ticks (" + String.format("%.1f", delay / 20.0) + "s)");
+        dbg("computeDelay('" + track.styleName() + "') -> animLen=" + animLength + " ticks x " + track.repetitions() + " reps = " + delay + " ticks (" + String.format("%.1f", delay / 20.0) + "s)");
         return delay;
     }
 
@@ -623,7 +623,7 @@ public class PlaylistManager {
         org.bukkit.configuration.ConfigurationSection section =
                 plugin.getConfig().getConfigurationSection("dances." + styleName);
         if (section == null) {
-            dbg("resolveAnimationLength('" + styleName + "') → style introuvable dans config → fallback " + DEFAULT_TICKS_PER_REP);
+            dbg("resolveAnimationLength('" + styleName + "') -> style not found in config -> fallback " + DEFAULT_TICKS_PER_REP);
             return DEFAULT_TICKS_PER_REP;
         }
 
@@ -633,10 +633,10 @@ public class PlaylistManager {
                 : section.getString("modelId");
         String animName = section.getString("animationName");
 
-        dbg("resolveAnimationLength('" + styleName + "') → modelId='" + modelId + "' animName='" + animName + "'");
+        dbg("resolveAnimationLength('" + styleName + "') -> modelId='" + modelId + "' animName='" + animName + "'");
 
         if (modelId == null || modelId.isBlank() || animName == null) {
-            dbg("  → modelId ou animName null → fallback " + DEFAULT_TICKS_PER_REP);
+            dbg("  -> modelId or animName null -> fallback " + DEFAULT_TICKS_PER_REP);
             return DEFAULT_TICKS_PER_REP;
         }
 
@@ -645,19 +645,19 @@ public class PlaylistManager {
                     .getMethod("getBlueprint", String.class)
                     .invoke(null, modelId.trim());
             if (blueprint == null) {
-                dbg("  → getBlueprint('" + modelId + "') retourne null → fallback " + DEFAULT_TICKS_PER_REP);
+                dbg("  -> getBlueprint('" + modelId + "') returned null -> fallback " + DEFAULT_TICKS_PER_REP);
                 return DEFAULT_TICKS_PER_REP;
             }
-            dbg("  → blueprint trouvé: " + blueprint.getClass().getSimpleName());
+            dbg("  -> blueprint found: " + blueprint.getClass().getSimpleName());
 
             Object animations = blueprint.getClass().getMethod("getAnimations").invoke(blueprint);
             if (!(animations instanceof java.util.Map)) {
-                dbg("  → getAnimations() n'est pas une Map → fallback " + DEFAULT_TICKS_PER_REP);
+                dbg("  -> getAnimations() is not a Map -> fallback " + DEFAULT_TICKS_PER_REP);
                 return DEFAULT_TICKS_PER_REP;
             }
 
             java.util.Map<?, ?> animMap = (java.util.Map<?, ?>) animations;
-            dbg("  → animations disponibles: " + animMap.keySet());
+            dbg("  -> available animations: " + animMap.keySet());
 
             Object animBlueprint = null;
             for (java.util.Map.Entry<?, ?> e : animMap.entrySet()) {
@@ -667,16 +667,16 @@ public class PlaylistManager {
                 }
             }
             if (animBlueprint == null) {
-                dbg("  → animation '" + animName + "' introuvable dans le blueprint → fallback " + DEFAULT_TICKS_PER_REP);
+                dbg("  -> animation '" + animName + "' not found in blueprint -> fallback " + DEFAULT_TICKS_PER_REP);
                 return DEFAULT_TICKS_PER_REP;
             }
-            dbg("  → animBlueprint trouvé: " + animBlueprint.getClass().getSimpleName());
+            dbg("  -> animBlueprint found: " + animBlueprint.getClass().getSimpleName());
 
             // getLength/getDuration retournent des secondes ; getFrameCount/getTickLength retournent des ticks.
             for (String method : new String[]{"getTickLength", "getFrameCount", "getLength", "getDuration"}) {
                 try {
                     Object result = animBlueprint.getClass().getMethod(method).invoke(animBlueprint);
-                    dbg("  → " + method + "() = " + result);
+                    dbg("  -> " + method + "() = " + result);
                     if (result instanceof Number num) {
                         double raw = num.doubleValue();
                         if (raw > 0) {
@@ -688,15 +688,15 @@ public class PlaylistManager {
                             return len;
                         }
                     }
-                } catch (NoSuchMethodException ignored) {
-                    dbg("  → méthode " + method + "() absente");
+                    } catch (NoSuchMethodException ignored) {
+                    dbg("  -> method " + method + "() missing");
                 }
             }
-            dbg("  → aucune méthode de longueur trouvée → fallback " + DEFAULT_TICKS_PER_REP);
+            dbg("  -> no length method found -> fallback " + DEFAULT_TICKS_PER_REP);
         } catch (Exception e) {
-            plugin.getLogger().warning("[Playlist] Durée d'animation indisponible pour '"
-                    + styleName + "' (fallback " + DEFAULT_TICKS_PER_REP + " ticks) : " + e.getMessage());
-            dbg("  → exception: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            plugin.getLogger().warning("[Playlist] Animation duration unavailable for '"
+                    + styleName + "' (fallback " + DEFAULT_TICKS_PER_REP + " ticks): " + e.getMessage());
+            dbg("  -> exception: " + e.getClass().getSimpleName() + " - " + e.getMessage());
         }
         return DEFAULT_TICKS_PER_REP;
     }

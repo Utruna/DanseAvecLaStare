@@ -1,47 +1,47 @@
-# Menus — DanseAvecLaStare
+# Menus — ModelDancer
 
-Cette page documente les menus d'inventaire fournis par le plugin et l'API minimale pour les ouvrir/étendre.
+This page documents the inventory menus provided by the plugin and the minimal API used to open or extend them.
 
-## Vue d'ensemble
+## Overview
 
-- Les menus sont des inventaires Bukkit avec un holder `DanceMenu`.
-- Les clics sont interceptés par `MenuListener` et dispatchés via `DanceMenuManager`.
-- Les handlers de clics sont stockés par-slot pour chaque joueur (map reconstruite à l'ouverture).
-- Navigation: `DanceMenuManager` maintient une pile par-joueur (`navStack`) et fournit des boutons « ← Retour ».
-- Plusieurs menus sont « one-shot » et ouvrent des prompts chat (création, renommage, changement de skin).
+- Menus are Bukkit inventories with a `DanceMenu` holder.
+- Clicks are intercepted by `MenuListener` and dispatched through `DanceMenuManager`.
+- Click handlers are stored per slot for each player (the map is rebuilt when the menu opens).
+- Navigation: `DanceMenuManager` keeps a per-player stack (`navStack`) and provides a `← Back` button.
+- Several menus are one-shot and open chat prompts for creation, renaming, or skin changes.
 
-## Menus publics (résumé)
+## Public Menus (Summary)
 
-- Player Main (`openPlayerMain`) — permet de danser, arrêter, voir la playlist active, accéder au menu staff si permission `danse.staff`.
-- Player Styles (`openPlayerStyles`) — liste des styles disponibles pour le joueur (clic gauche = lancer, clic droit = chat pour pseudo skin).
+- Player Main (`openPlayerMain`) - lets the player dance, stop, see the active playlist, and access the staff menu if they have `danse.staff`.
+- Player Styles (`openPlayerStyles`) - lists the styles available to the player (left click = start, right click = chat for skin name).
 
-- Staff Main (`openStaffMain`) — central pour le staff: accès aux danseurs statiques, chorégraphies, playlists, joueurs en ligne, paramètres d'affichage, créer danseur.
-- Staff Dancer (`openStaffDancer`) — gestion d'un danseur statique : changer style, déplacer, assigner playlist/groupe, changer skin, renommer, supprimer.
-- Staff Playlist (`openStaffPlaylist`) — éditeur d'une playlist : voir pistes, retirer piste (clic), lancer sur cible, ajouter piste.
-- Staff Playlist List (`openStaffPlaylistList`) — liste des playlists, création d'une nouvelle playlist (one-shot chat).
-- Staff Choreo (list / group) — gestion des groupes de chorégraphie, création, ajout/suppression, sync.
-- Pickers (playlist picker, target picker, group picker, player picker) — sous-menus pour sélectionner cibles ou objets.
-- Choreo config / Playlist track config — écrans de configuration de répétitions avec boutons +/- et confirmation.
+- Staff Main (`openStaffMain`) - central hub for staff: access static dancers, choreography, playlists, online players, display settings, and dancer creation.
+- Staff Dancer (`openStaffDancer`) - manage a static dancer: change style, move, assign playlist/group, change skin, rename, delete.
+- Staff Playlist (`openStaffPlaylist`) - playlist editor: view tracks, remove a track (click), start on a target, add a track.
+- Staff Playlist List (`openStaffPlaylistList`) - list playlists, create a new playlist (one-shot chat).
+- Staff Choreo (list / group) - manage choreography groups, create, add/remove, sync.
+- Pickers (playlist picker, target picker, group picker, player picker) - submenus used to select targets or objects.
+- Choreo config / Playlist track config - repetition configuration screens with +/- buttons and confirmation.
 
-> Pour la liste complète et le comportement détaillé, voir les méthodes `open*` dans `src/main/java/me/utruna/danse/menu/DanceMenuManager.java`.
+> For the full list and detailed behavior, see the `open*` methods in `src/main/java/me/utruna/danse/menu/DanceMenuManager.java`.
 
-## Interactions et contrôles importants
+## Important Interactions and Controls
 
-- Retour: la méthode `makeBack()` place un item `ARROW` en slot dédié qui invoque la page précédente.
-- Confirmation de suppression: la plupart des actions destructrices exigent `Shift+clic`.
-- Changement via chat: opérations créant/renommant/changer skin s'inscrivent comme listeners temporaires (`OneShot*`) qui lisent le prochain message du joueur.
-- Les slots vides sont remplis par des vitres grises (`makeGlass()`) pour éviter clics invalides.
+- Back: `makeBack()` places an `ARROW` item in a dedicated slot that opens the previous page.
+- Delete confirmation: most destructive actions require `Shift+click`.
+- Chat-based changes: operations that create, rename, or change skin register temporary listeners (`OneShot*`) that read the player's next chat message.
+- Empty slots are filled with gray glass (`makeGlass()`) to avoid invalid clicks.
 
-## API minimale (référence rapide)
+## Minimal API (Quick Reference)
 
-- Interface `DanceMenu` (holder):
-  - `Inventory getInventory()` (hérité d'InventoryHolder)
-  - `void handleClick(InventoryClickEvent e, Player player)` — dispatch interne proposé.
+- `DanceMenu` interface (holder):
+  - `Inventory getInventory()` (inherited from `InventoryHolder`)
+  - `void handleClick(InventoryClickEvent e, Player player)` - proposed internal dispatch.
 
-- Interface fonctionnelle `ClickHandler`:
-  - `void onClick(Player player, ClickType clickType)` — handler pour un slot.
+- Functional interface `ClickHandler`:
+  - `void onClick(Player player, ClickType clickType)` - slot handler.
 
-- `DanceMenuManager` (exposé via constructeur dans le plugin): méthodes publiques utiles :
+- `DanceMenuManager` (exposed through the plugin constructor): useful public methods:
   - `openPlayerMain(Player p)`
   - `openPlayerSettings(Player p)`
   - `openPlayerStyles(Player p)`
@@ -58,46 +58,45 @@ Cette page documente les menus d'inventaire fournis par le plugin et l'API minim
   - `openStaffPlayer(Player viewer, Player target)`
   - `openPlayerStylePicker(Player viewer, Player target)`
 
-  Remarques d'implémentation :
-  - `beginOpen(...)` initialise l'état par-joueur et pousse une clef de nav (`navStack`).
-  - `register(Inventory inv, int slot, ItemStack item, ClickHandler handler)` place un item et enregistre le handler pour le slot courant.
-  - `dispatch(Player p, int slot, ClickType click)` appelle le handler enregistré pour ce joueur/slot.
+  Implementation notes:
+  - `beginOpen(...)` initializes per-player state and pushes a navigation key (`navStack`).
+  - `register(Inventory inv, int slot, ItemStack item, ClickHandler handler)` places an item and registers the handler for the current slot.
+  - `dispatch(Player p, int slot, ClickType click)` calls the handler registered for that player/slot.
 
-- `MenuListener` : écoute `InventoryClickEvent` et `InventoryCloseEvent` et délègue aux `DanceMenu`.
+- `MenuListener`: listens to `InventoryClickEvent` and `InventoryCloseEvent` and delegates to `DanceMenu`.
 
-- `MenuType` : énumère quelques types logiques utilisés par l'UI : `PLAYER_MAIN`, `PLAYER_STYLES`, `STAFF_MAIN`, `STAFF_DANCER`, `STAFF_PLAYLIST`, `STAFF_CHOREOGRAPHY`, `CHOREO_SELECT_STYLE`, `CHOREO_CONFIG_TRACK`.
+- `MenuType`: enumerates the logical UI types used by the interface: `PLAYER_MAIN`, `PLAYER_STYLES`, `STAFF_MAIN`, `STAFF_DANCER`, `STAFF_PLAYLIST`, `STAFF_CHOREOGRAPHY`, `CHOREO_SELECT_STYLE`, `CHOREO_CONFIG_TRACK`.
 
-  Note: le menu Paramètres existe bien dans le code, mais il n'est pas encore reflété dans `MenuType`.
+  Note: the Settings menu exists in the code, but it is not yet reflected in `MenuType`.
 
-## Exemples d'utilisation
+## Usage Examples
 
-- Ouvrir le menu joueur depuis une commande / event handler :
+- Open the player menu from a command or event handler:
 
 ```java
-// injection via votre instance de DanceMenuManager
+// inject your DanceMenuManager instance
 menuManager.openPlayerMain(player);
 ```
 
-- Forcer ouverture du menu staff pour un joueur (vérifier permission `danse.staff` avant) :
+- Force open the staff menu for a player (check `danse.staff` first):
 
 ```java
 if (player.hasPermission("danse.staff")) menuManager.openStaffMain(player);
 ```
 
-## Notes pour contributeurs
+## Contributor Notes
 
-- Les handlers de clics sont valables uniquement pour l'ouverture courante; ils sont nettoyés au `InventoryClose` (après délai 1 tick pour permettre navigation interne).
-- Si vous ajoutez un nouveau menu `openXXX`, utilisez `beginOpen(...)`, `register(...)`, `fill(...)` et `p.openInventory(inv)` pour rester compatible.
-- Pour créer un one-shot chat prompt, suivez le pattern `OneShot*` (enregistrer le listener, annuler le chat, HandlerList.unregisterAll(this) après réception).
+- Click handlers are only valid for the current opening; they are cleaned up on `InventoryClose` (after a 1 tick delay to allow internal navigation).
+- If you add a new `openXXX` menu, use `beginOpen(...)`, `register(...)`, `fill(...)`, and `p.openInventory(inv)` to stay compatible.
+- To create a one-shot chat prompt, follow the `OneShot*` pattern (register the listener, cancel chat, call `HandlerList.unregisterAll(this)` after receiving the message).
 
 ---
 
-Fichiers source à consulter :
+Source files to inspect:
 - [DanceMenuManager](src/main/java/me/utruna/danse/menu/DanceMenuManager.java)
 - [MenuListener](src/main/java/me/utruna/danse/menu/MenuListener.java)
 - [ClickHandler](src/main/java/me/utruna/danse/menu/ClickHandler.java)
 - [DanceMenu](src/main/java/me/utruna/danse/menu/DanceMenu.java)
 - [MenuType](src/main/java/me/utruna/danse/menu/MenuType.java)
 
-
-Si vous voulez, j'ajoute un lien depuis le README vers cette page ou j'étends la doc avec des captures d'écran et exemples plus détaillés.
+If you want, I can add a link from the README to this page or expand the doc with screenshots and more detailed examples.

@@ -4,19 +4,19 @@ import org.bukkit.Location;
 import org.bukkit.entity.ArmorStand;
 
 /**
- * Style de danse configurable chargé depuis {@code config.yml}.
- * Mode {@code STATIC} : le modèle reste à la position du joueur.
- * Mode {@code DYNAMIC} : le yaw oscille sinusoïdalement autour du yaw d'origine.
+ * Configurable dance style loaded from {@code config.yml}.
+ * {@code STATIC} mode: the model stays at the player's position.
+ * {@code DYNAMIC} mode: the yaw oscillates sinusoidally around the original yaw.
  */
 public class GenericDanceStyle implements DanceStyle {
 
     private final String name;
     private final boolean isStatic;          // true = STATIC, false = DYNAMIC
-    private final String pattern;            // Pour DYNAMIC : "wave"
+    private final String pattern;            // For DYNAMIC: "wave"
 
     public enum MovementType {
-        STATIC,     // Joueur immobile
-        DYNAMIC     // Joueur se déplace
+        STATIC,     // Player stationary
+        DYNAMIC     // Player in motion
     }
 
     public GenericDanceStyle(String name, boolean isStatic, String pattern, double rotationSpeed, double radius) {
@@ -35,11 +35,11 @@ public class GenericDanceStyle implements DanceStyle {
         Location loc = origin.clone();
 
         if (isStatic) {
-            // STATIC : Le joueur ne bouge pas
+            // STATIC: the player does not move
             return loc;
         }
 
-        // DYNAMIC : rotation simple; les mouvements visuels sont gérés par le BBMODEL
+        // DYNAMIC: simple rotation; visual motion is handled by the BBMODEL
         double phase = tick * 0.15;
         loc.setYaw(normalizeYaw(origin.getYaw() + (float) (Math.sin(phase) * 40.0)));
         return loc;
@@ -47,8 +47,8 @@ public class GenericDanceStyle implements DanceStyle {
 
     @Override
     public void applyPose(ArmorStand as, int tick) {
-        // Pour ModelEngine, on ne s'occupe pas de la pose des ArmorStands
-        // La pose est gérée par le blueprint ModelEngine
+        // For ModelEngine, ArmorStand posing is ignored here.
+        // The pose is handled by the ModelEngine blueprint.
     }
 
     protected float normalizeYaw(float yaw) {
@@ -57,7 +57,7 @@ public class GenericDanceStyle implements DanceStyle {
         return yaw;
     }
 
-    // Getters
+    // Accessors
     public boolean isStatic() {
         return isStatic;
     }

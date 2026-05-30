@@ -13,7 +13,7 @@ class PluginYamlTest {
     @Test
     void pluginYmlShouldNotContainTabs() throws IOException {
         String content = Files.readString(Path.of("src/main/resources/plugin.yml"));
-        assertFalse(content.contains("\t"), "plugin.yml ne doit pas contenir de tabulations");
+        assertFalse(content.contains("\t"), "plugin.yml must not contain tab characters");
     }
 
     @Test

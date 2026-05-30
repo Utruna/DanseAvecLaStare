@@ -31,10 +31,10 @@ public class ChoreoCommandHandler {
                 String groupId = args[2];
                 List<String> ids = Arrays.asList(args).subList(3, args.length);
                 if (staticDancerManager.createChoreography(groupId, ids)) {
-                    sender.sendMessage("§aGroupe §f'" + groupId + "'§a créé avec §f" + ids.size()
-                            + "§a danseur(s). Animations synchronisées !");
+                        sender.sendMessage("§aGroup §f'" + groupId + "'§a created with §f" + ids.size()
+                            + "§a dancer(s). Animations synchronized!");
                 } else {
-                    sender.sendMessage("§cErreur : un ou plusieurs IDs sont introuvables. IDs valides : §f"
+                        sender.sendMessage("§cError: one or more IDs were not found. Valid IDs: §f"
                             + String.join(", ", staticDancerManager.getDancerIds()));
                 }
             }
@@ -44,10 +44,10 @@ public class ChoreoCommandHandler {
                     return true;
                 }
                 if (staticDancerManager.addToChoreography(args[2], args[3])) {
-                    sender.sendMessage("§a'§f" + args[3] + "§a' ajouté au groupe §f'" + args[2]
-                            + "'§a. Re-synchronisation effectuée.");
+                    sender.sendMessage("§a'§f" + args[3] + "§a' added to group §f'" + args[2]
+                            + "'§a. Resynchronization complete.");
                 } else {
-                    sender.sendMessage("§cDanseur '§f" + args[3] + "§c' introuvable.");
+                    sender.sendMessage("§cDancer '§f" + args[3] + "§c' not found.");
                 }
             }
             case "remove" -> {
@@ -56,9 +56,9 @@ public class ChoreoCommandHandler {
                     return true;
                 }
                 if (staticDancerManager.removeFromChoreography(args[2], args[3])) {
-                    sender.sendMessage("§a'§f" + args[3] + "§a' retiré du groupe §f'" + args[2] + "'§a.");
+                    sender.sendMessage("§a'§f" + args[3] + "§a' removed from group §f'" + args[2] + "'§a.");
                 } else {
-                    sender.sendMessage("§cDanseur ou groupe introuvable.");
+                    sender.sendMessage("§cDancer or group not found.");
                 }
             }
             case "sync" -> {
@@ -67,9 +67,9 @@ public class ChoreoCommandHandler {
                     return true;
                 }
                 if (staticDancerManager.syncChoreography(args[2])) {
-                    sender.sendMessage("§aGroupe §f'" + args[2] + "'§a re-synchronisé !");
+                    sender.sendMessage("§aGroup §f'" + args[2] + "'§a resynchronized!");
                 } else {
-                    sender.sendMessage("§cGroupe '§f" + args[2] + "§c' introuvable.");
+                    sender.sendMessage("§cGroup '§f" + args[2] + "§c' not found.");
                 }
             }
             case "delete" -> {
@@ -78,22 +78,22 @@ public class ChoreoCommandHandler {
                     return true;
                 }
                 if (staticDancerManager.deleteChoreography(args[2])) {
-                    sender.sendMessage("§aGroupe §f'" + args[2] + "'§a supprimé. Danseurs en mode individuel.");
+                    sender.sendMessage("§aGroup §f'" + args[2] + "'§a deleted. Dancers are now in individual mode.");
                 } else {
-                    sender.sendMessage("§cGroupe '§f" + args[2] + "§c' introuvable.");
+                    sender.sendMessage("§cGroup '§f" + args[2] + "§c' not found.");
                 }
             }
             case "list" -> {
                 Map<String, Set<String>> groups = staticDancerManager.getChoreographyGroups();
                 if (groups.isEmpty()) {
-                    sender.sendMessage("§eAucun groupe de chorégraphie actif.");
+                    sender.sendMessage("§eNo active choreography groups.");
                 } else {
-                    sender.sendMessage("§e=== Groupes de chorégraphie ===");
+                    sender.sendMessage("§e=== Choreography groups ===");
                     groups.forEach((gId, members) ->
                             sender.sendMessage("§f" + gId + " §7(" + members.size() + ") §8→ §7" + String.join(", ", members)));
                 }
             }
-            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: create, add, remove, sync, delete, list");
+            default -> sender.sendMessage("§cUnknown subcommand. Use: create, add, remove, sync, delete, list");
         }
         return true;
     }

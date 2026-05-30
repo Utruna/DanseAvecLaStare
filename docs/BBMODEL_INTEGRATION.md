@@ -1,40 +1,40 @@
-# Guide d'intégration BBMODEL
+# BBMODEL Integration Guide
 
-Objectif : préparer un `.bbmodel` compatible avec l'application du skin joueur via ModelEngine 4.0.9.
-
----
-
-## Pipeline technique
-
-Flux d'exécution pour appliquer un skin sur un modèle animé :
-
-1. Récupérer le `PlayerProfile` (sync depuis le joueur connecté, ou via `SkinService` async pour un pseudo tiers).
-2. Créer un `Dummy<PlayerProfile>` et l'enregistrer auprès de ModelEngine (`createModeledEntity`).
-3. Charger l'`ActiveModel` correspondant au `modelId` et l'attacher via `addModel(...)`.
-4. Parcourir `activeModel.getBones()` ; pour chaque bone exposant un behavior `PlayerLimb`, appeler `setTexture(profile)`.
-5. Lancer l'animation via `activeModel.getAnimationHandler().playAnimation(animationName, ...)`.
-
-> `Dummy<PlayerProfile>` est la source de vérité du skin côté serveur.  
-> Si `setTexture` est appelé correctement sur chaque limb mais que le rendu reste absent, le problème est dans le `.bbmodel` ou le resource pack client — pas dans le code Java.
+Goal: prepare a `.bbmodel` that is compatible with player skin application through ModelEngine 4.0.9.
 
 ---
 
-## Préparation du .bbmodel
+## Technical Pipeline
 
-**Nommage des bones (obligatoire)**
+Execution flow for applying a skin to an animated model:
 
-Les bones de premier niveau doivent avoir exactement ces noms pour que ModelEngine détecte les `PlayerLimb` :
+1. Retrieve the `PlayerProfile` (synchronously from the connected player, or through `SkinService` asynchronously for a third-party username).
+2. Create a `Dummy<PlayerProfile>` and register it with ModelEngine (`createModeledEntity`).
+3. Load the `ActiveModel` matching the `modelId` and attach it with `addModel(...)`.
+4. Iterate through `activeModel.getBones()`; for each bone exposing a `PlayerLimb` behavior, call `setTexture(profile)`.
+5. Start the animation through `activeModel.getAnimationHandler().playAnimation(animationName, ...)`.
 
-| Bone exact        | Membre         |
-|-------------------|----------------|
-| `phead_head`      | Tête           |
-| `pbody_body`      | Torse          |
-| `prarm_right_arm` | Bras droit     |
-| `plarm_left_arm`  | Bras gauche    |
-| `prleg_right_leg` | Jambe droite   |
-| `plleg_left_leg`  | Jambe gauche   |
+> `Dummy<PlayerProfile>` is the source of truth for the skin on the server side.  
+> If `setTexture` is called correctly on each limb but the model still does not render, the issue is in the `.bbmodel` or the client resource pack, not in the Java code.
 
-La hiérarchie attendue dans Blockbench est la suivante (seul le premier niveau compte pour la détection) :
+---
+
+## Preparing the `.bbmodel`
+
+**Bone naming (required)**
+
+Top-level bones must use exactly these names so that ModelEngine detects `PlayerLimb` behaviors:
+
+| Exact bone         | Body part      |
+|--------------------|----------------|
+| `phead_head`       | Head           |
+| `pbody_body`       | Body           |
+| `prarm_right_arm`  | Right arm      |
+| `plarm_left_arm`   | Left arm       |
+| `prleg_right_leg`  | Right leg      |
+| `plleg_left_leg`   | Left leg       |
+
+Expected hierarchy in Blockbench (only the first level matters for detection):
 
 ```
 waist
@@ -58,58 +58,58 @@ waist
     └── Left Leg Layer
 ```
 
-**Nom de l'animation (obligatoire)**
+**Animation name (required)**
 
-L'animation doit s'appeler exactement **`dance`** dans Blockbench. La config `animationName: dance` dans `config.yml` doit correspondre à ce nom.
+The animation must be named exactly **`dance`** in Blockbench. The `animationName: dance` entry in `config.yml` must match that name.
 
-**Règles de géométrie**
+**Geometry rules**
 
-- Chaque limb doit avoir des cubes visibles et ne doit pas être placé dans un groupe masqué.
-- Chaque limb doit être indépendant (pas parenté à la tête ou à un autre limb).
-
----
-
-## Intégration dans ModelEngine
-
-1. Exporter le `.bbmodel` depuis Blockbench (conserver textures et animations).
-2. Copier le fichier dans `plugins/ModelEngine/blueprints/`.
-3. Vérifier côté serveur : `createActiveModel(modelId)` retourne un `ActiveModel` non nul.
-4. Lancer `/danse debug` et vérifier que les bones `PlayerLimb` sont détectés (`Bones found: N`) et que `✓ Skin applied` apparaît pour chaque limb attendu.
-5. Vérifier que l'animation `dance` est bien présente dans le blueprint (visible dans les logs debug si le nom ne correspond pas).
+- Each limb must have visible cubes and must not be placed in a hidden group.
+- Each limb must be independent (not parented to the head or to another limb).
 
 ---
 
-## Vérification rapide
+## ModelEngine Integration
 
-**Côté serveur (logs `/danse debug`)**
-- `Bones found: N` — valeur non nulle
-- `✓ Skin applied` pour chaque limb attendu
+1. Export the `.bbmodel` from Blockbench (keep textures and animations).
+2. Copy the file into `plugins/ModelEngine/blueprints/`.
+3. Verify on the server side that `createActiveModel(modelId)` returns a non-null `ActiveModel`.
+4. Run `/danse debug` and verify that the `PlayerLimb` bones are detected (`Bones found: N`) and that `✓ Skin applied` appears for each expected limb.
+5. Verify that the `dance` animation exists in the blueprint (visible in debug logs if the name does not match).
+
+---
+
+## Quick Check
+
+**Server side (`/danse debug` logs)**
+- `Bones found: N` - non-zero value
+- `✓ Skin applied` for each expected limb
 - `activeModel != null`
 
-**Côté modèle / client**
-- L'animation dans Blockbench s'appelle bien `dance` (et `animationName: dance` dans `config.yml`)
-- Les cubes des limbs sont présents et visibles dans Blockbench
-- Le resource pack ModelEngine est correctement chargé par le client
+**Model / client side**
+- The Blockbench animation is named `dance` (and `animationName: dance` in `config.yml`)
+- The limb cubes are present and visible in Blockbench
+- The ModelEngine resource pack is correctly loaded by the client
 
 ---
 
-## Dépannage
+## Troubleshooting
 
-**Procédure d'isolation recommandée**
+**Recommended isolation procedure**
 
-Créer un `.bbmodel` minimal avec `phead_` uniquement, puis réintroduire les membres un à un et tester à chaque étape :
+Create a minimal `.bbmodel` with only `phead_`, then add the limbs back one at a time and test at each step:
 
-1. `phead_` → confirmer que la tête affiche le skin
-2. `pbody_` → confirmer que le torse affiche le skin
-3. `prarm_` / `plarm_` → bras droit puis gauche
-4. `prleg_` / `plleg_` → jambes
+1. `phead_` - confirm that the head shows the skin
+2. `pbody_` - confirm that the body shows the skin
+3. `prarm_` / `plarm_` - right arm, then left arm
+4. `prleg_` / `plleg_` - legs
 
-**Points techniques**
+**Technical notes**
 
-- `HeadForcedImpl` est un behavior interne ajouté automatiquement par ModelEngine ; ne pas tenter de le supprimer depuis le plugin.
-- Si la tête fonctionne mais pas les autres membres, le problème est dans la géométrie du `.bbmodel` ou le resource pack côté client, pas dans le code Java.
-- `setTexture(PlayerProfile)` est l'approche principale ; `setTexture(Player)` est implémenté en fallback via réflexion.
+- `HeadForcedImpl` is an internal behavior added automatically by ModelEngine; do not try to remove it from the plugin.
+- If the head works but not the other limbs, the problem is in the `.bbmodel` geometry or the client resource pack, not in the Java code.
+- `setTexture(PlayerProfile)` is the main approach; `setTexture(Player)` is implemented as a reflection-based fallback.
 
-**Si le problème persiste**
+**If the problem persists**
 
-Joindre le `.bbmodel` et les logs de `/danse debug` dans une issue pour analyse.
+Attach the `.bbmodel` and the `/danse debug` logs to an issue for analysis.

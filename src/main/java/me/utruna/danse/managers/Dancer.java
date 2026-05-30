@@ -4,41 +4,41 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
 /**
- * Contrat d'un danseur : entité animée associée à un joueur, mise à jour chaque tick.
- * L'implémentation actuelle est {@link ModelEngineDancer} (via ModelEngine).
+ * Contract for a dancer: animated entity attached to a player and updated every tick.
+ * The current implementation is {@link ModelEngineDancer} (through ModelEngine).
  */
 public interface Dancer {
 
     /**
-     * Crée l'entité danseur à la position donnée.
-     * Doit être appelé sur le thread principal Bukkit.
+    * Creates the dancer entity at the given position.
+    * Must be called on the Bukkit main thread.
      *
-     * @param location position de départ du danseur
-     * @param player   joueur propriétaire de la danse
-     * @throws IllegalStateException si un prérequis est manquant (blueprint introuvable, etc.)
+    * @param location dancer spawn location
+    * @param player   player owning the dance
+    * @throws IllegalStateException if a prerequisite is missing (blueprint not found, etc.)
      */
     void spawn(Location location, Player player);
 
     /**
-     * Met à jour la position et l'animation pour le tick courant.
-     * Appelé chaque tick par la tâche répétitive du {@link DanceManager}.
+    * Updates the position and animation for the current tick.
+    * Called every tick by the repeating task in {@link DanceManager}.
      *
-     * @param tick  compteur incrémentiel depuis le démarrage de la danse
-     * @param style style actif utilisé pour calculer la position
+    * @param tick  incremental counter since the dance started
+    * @param style active style used to compute the position
      */
     void tick(int tick, DanceStyle style);
 
-    /** Détruit l'entité et libère toutes les ressources associées. */
+    /** Destroys the entity and releases all associated resources. */
     void stop();
 
-    /** Met à jour la distance d'affichage si l'implémentation le supporte. */
+    /** Updates the render distance if the implementation supports it. */
     default void setRenderRadius(int radius) {
     }
 
     /**
-     * Change la visibilité du dummy pour son propriétaire.
-     * {@code true} → visible uniquement par le propriétaire (mode aperçu).
-     * {@code false} → caché au propriétaire (mode danse normal).
+    * Changes the dummy visibility for its owner.
+    * {@code true} -> visible only to the owner (preview mode).
+    * {@code false} -> hidden from the owner (normal dance mode).
      */
     default void setOwnerCanSee(boolean canSee) {
     }

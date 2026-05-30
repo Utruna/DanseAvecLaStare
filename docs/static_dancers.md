@@ -1,46 +1,46 @@
-# Danseurs statiques
+# Static Dancers
 
-Les danseurs statiques sont des entités ModelEngine indépendantes des joueurs, placées à une position fixe dans le monde.
-
----
-
-## Commandes
-
-Toutes les commandes NPC passent par `/danse npc <sous-commande>`.
-
-```
-/danse npc spawn <id> <style>           Pose un NPC à ta position avec ton skin
-/danse npc spawn <id> <style> <pseudo>  Idem avec le skin d'un autre joueur (Mojang async)
-/danse npc move <id>                    Déplace le NPC à ta position actuelle
-/danse npc delete <id>                  Supprime le NPC et l'efface de la sauvegarde
-/danse npc list                         Liste tous les IDs actifs
-/danse npc highlight <id> [secondes]    Signale un NPC avec des particules (défaut : 3s)
-/danse npc resize <id> <valeur>         Redimensionne le NPC (0.1 – 20.0, défaut : 1.0)
-/danse npc style <id> <style>           Change le style de danse d'un NPC existant
-```
-
-- `spawn` et `move` sont réservés aux joueurs (besoin de leur position).
-- `delete`, `list`, `resize`, `style` et `highlight` sont utilisables depuis la console.
-- La complétion par Tab fonctionne sur les IDs actifs et les styles disponibles.
-
-### highlight
-
-Fait apparaître une colonne de particules (`TOTEM_OF_UNDYING` + `CRIT`) au-dessus du NPC pendant la durée indiquée. Utile pour localiser rapidement un NPC dans une zone chargée.
-
-```
-/danse npc highlight lobby_dj        → particules pendant 3 secondes (défaut)
-/danse npc highlight lobby_dj 10     → particules pendant 10 secondes
-```
-
-- La durée est optionnelle, défaut : 3 secondes.
-- Les particules sont visibles par tous les joueurs à portée.
-- La tâche s'annule automatiquement si le danseur est supprimé avant la fin.
+Static dancers are ModelEngine entities independent from players, placed at a fixed position in the world.
 
 ---
 
-## Persistance
+## Commands
 
-Les danseurs sont sauvegardés dans `plugins/DanseAvecLaStare/static_dancers.yml`.
+All NPC commands go through `/danse npc <subcommand>`.
+
+```
+/danse npc spawn <id> <style>           Spawn an NPC at your position with your skin
+/danse npc spawn <id> <style> <player>  Same, but using another player's skin (Mojang async)
+/danse npc move <id>                    Move the NPC to your current position
+/danse npc delete <id>                  Delete the NPC and remove it from persistence
+/danse npc list                         List all active IDs
+/danse npc highlight <id> [seconds]     Highlight an NPC with particles (default: 3s)
+/danse npc resize <id> <value>          Resize the NPC (0.1 - 20.0, default: 1.0)
+/danse npc style <id> <style>           Change the dance style of an existing NPC
+```
+
+- `spawn` and `move` are player-only because they rely on player position.
+- `delete`, `list`, `resize`, `style`, and `highlight` can be used from the console.
+- Tab completion works on active IDs and available styles.
+
+### Highlight
+
+Shows a particle column (`TOTEM_OF_UNDYING` + `CRIT`) above the NPC for the specified duration. Useful for finding an NPC quickly in a busy area.
+
+```
+/danse npc highlight lobby_dj        -> particles for 3 seconds (default)
+/danse npc highlight lobby_dj 10     -> particles for 10 seconds
+```
+
+- Duration is optional; default is 3 seconds.
+- The particles are visible to all players in range.
+- The task automatically cancels if the dancer is removed before it finishes.
+
+---
+
+## Persistence
+
+Dancers are saved in `plugins/ModelDancer/static_dancers.yml`.
 
 ```yaml
 dancers:
@@ -53,7 +53,7 @@ dancers:
     style: dj
     skin: Utruna
     scale: 1.5
-  danseur_accueil:
+  lobby_dancer:
     world: world
     x: 50.0
     y: 64.0
@@ -64,86 +64,86 @@ dancers:
     scale: 1.0
 ```
 
-- `skin` : pseudo du joueur dont le skin est utilisé. Null = skin par défaut (Steve/Alex).
-- `scale` : facteur d'échelle du modèle (défaut : `1.0`, max : `20.0`). Persisté dans le YAML et restauré au redémarrage.
-- Le fichier est géré automatiquement. Ne pas modifier manuellement sauf pour corriger une entrée.
-- Au **redémarrage**, les danseurs sont restaurés avec un délai de 3 secondes (60 ticks) pour laisser ModelEngine charger ses blueprints.
-- Au **onDisable**, les entités sont détruites mais le fichier est conservé.
+- `skin`: player name whose skin is used. Null = default skin (Steve/Alex).
+- `scale`: model scale factor (default: `1.0`, max: `20.0`). Persisted in YAML and restored on restart.
+- The file is managed automatically. Do not edit it manually unless you need to fix an entry.
+- On **restart**, dancers are restored with a 3 second delay (60 ticks) to give ModelEngine time to load its blueprints.
+- On **onDisable**, entities are destroyed but the file is preserved.
 
 ---
 
-## Pipeline technique
+## Technical Pipeline
 
-1. `spawnStaticDancer()` crée un `Dummy<PlayerProfile>` avec orientation (`setYBodyRot` / `setYHeadRot`) appliquée immédiatement.
-2. L'`ActiveModel` est chargé via `createActiveModel(blueprintId)` en respectant `useFallbackMode`.
-3. Si un skin est fourni, `applySkinToModel()` applique la texture par réflexion sur les bones compatibles. Les méthodes `setTexture` trouvées sur chaque classe de behavior sont mises en cache statiquement dans `ModelEngineDancer` pour éviter les appels répétés à `getMethods()`.
-4. Si `scale != 1.0`, `activeModel.setScale(scale)` est appelé après le spawn.
-5. **Le danseur est pris en charge par le global tick** — aucune `BukkitTask` individuelle n'est créée par danseur. Un unique `globalTask` (1 tick/cycle, démarré dans le constructeur de `StaticDancerManager`) itère sur tous les danseurs actifs et tous les groupes à chaque tick et relance les animations arrêtées.
-6. `saveDancer()` écrit la position, le style, le pseudo et l'échelle dans le YAML (`synchronized` pour les écritures concurrentes lors des fetch Mojang async).
-7. `moveStaticDancer()` met à jour `dummy.setLocation()` + `setYBodyRot/YHeadRot` et écrase l'entrée du fichier.
-8. `setScale()` appelle `activeModel.setScale()` et persiste la valeur ; l'échelle est aussi réappliquée dans `swapModel()` pour survivre aux changements d'animation.
-9. `changeDancerStyle()` suspend temporairement l'animation via `pausedDancers` / `pausedGroups` (voir ci-dessous), appelle `changeAnimation()` puis retire l'entrée de pause et persiste le nouveau style dans le YAML.
+1. `spawnStaticDancer()` creates a `Dummy<PlayerProfile>` with the orientation (`setYBodyRot` / `setYHeadRot`) applied immediately.
+2. The `ActiveModel` is loaded through `createActiveModel(blueprintId)` while respecting `useFallbackMode`.
+3. If a skin is provided, `applySkinToModel()` applies the texture through reflection on the compatible bones. The discovered `setTexture` methods for each behavior class are cached statically in `ModelEngineDancer` to avoid repeated `getMethods()` calls.
+4. If `scale != 1.0`, `activeModel.setScale(scale)` is called after spawn.
+5. **The dancer is driven by the global tick** - no individual `BukkitTask` is created per dancer. A single `globalTask` (1 tick/cycle, started in the `StaticDancerManager` constructor) iterates over all active dancers and all groups every tick and restarts stopped animations.
+6. `saveDancer()` writes the position, style, player name, and scale to YAML (`synchronized` to protect concurrent writes during async Mojang fetches).
+7. `moveStaticDancer()` updates `dummy.setLocation()` plus `setYBodyRot` / `setYHeadRot` and overwrites the saved entry.
+8. `setScale()` calls `activeModel.setScale()` and persists the value; scale is also reapplied in `swapModel()` so it survives animation changes.
+9. `changeDancerStyle()` temporarily pauses the animation through `pausedDancers` / `pausedGroups` (see below), calls `changeAnimation()`, then removes the pause entry and persists the new style in YAML.
 
-## Gestion des erreurs
+## Error Handling
 
-- Blueprint introuvable → warning dans les logs, spawn annulé, fichier non modifié.
-- Monde non chargé au restart → warning, entrée ignorée (conservée dans le fichier).
-- Échec de `destroy()` au delete → warning logué, entrée retirée quand même du fichier et de la map.
+- Blueprint not found -> warning in logs, spawn canceled, file unchanged.
+- World not loaded on restart -> warning, entry ignored (kept in the file).
+- `destroy()` failure on delete -> warning logged, entry still removed from the file and map.
 
 ---
 
-## Chorégraphie
+## Choreography
 
-Les chorégraphies synchronisent les animations de plusieurs danseurs statiques sur le même tick.
+Choreography groups synchronize animations for multiple static dancers on the same tick.
 
-### Commandes
+### Commands
 
 ```
-/danse choreo create <groupId> <id1> [id2…]  Crée un groupe et lance les animations simultanément
-/danse choreo add <groupId> <id>             Ajoute un danseur et re-synchronise
-/danse choreo remove <groupId> <id>          Retire un danseur (reprend en mode solo)
-/danse choreo sync <groupId>                 Force la re-synchronisation sans dissoudre le groupe
-/danse choreo delete <groupId>               Dissout le groupe (les danseurs reprennent en solo)
-/danse choreo list                           Liste tous les groupes et leurs membres
+/danse choreo create <groupId> <id1> [id2...]   Create a group and start animations simultaneously
+/danse choreo add <groupId> <id>               Add a dancer and resynchronize
+/danse choreo remove <groupId> <id>            Remove a dancer (returns to solo mode)
+/danse choreo sync <groupId>                   Force resynchronization without dissolving the group
+/danse choreo delete <groupId>                 Dissolve the group (dancers return to solo mode)
+/danse choreo list                             List all groups and their members
 ```
 
-- Toutes ces commandes sont utilisables depuis la console.
-- La complétion par Tab fonctionne sur les IDs de groupes et de danseurs.
+- All of these commands can be used from the console.
+- Tab completion works on group and dancer IDs.
 
-### Persistance
+### Persistence
 
-Les groupes sont sauvegardés dans `plugins/DanseAvecLaStare/choreography.yml`.
+Groups are saved in `plugins/ModelDancer/choreography.yml`.
 
 ```yaml
 groups:
-  scene_principale:
+  main_scene:
     - lobby_dj
-    - danseur_accueil
-  fond_de_scene:
-    - danseur_gauche
-    - danseur_droit
+    - lobby_dancer
+  background:
+    - left_dancer
+    - right_dancer
 ```
 
-- Au redémarrage, les groupes sont restaurés avec un délai supplémentaire de 40 ticks après les danseurs (pour laisser le temps aux fetches de skin async).
-- Si un ID de danseur est introuvable au chargement, il est ignoré avec un warning.
-- Quand un danseur est dans un groupe, sa tâche d'animation individuelle est suspendue ; c'est la tâche partagée du groupe qui pilote tous ses membres.
+- On restart, groups are restored with an additional 40 tick delay after the dancers (to allow async skin fetches to complete).
+- If a dancer ID is missing during loading, it is ignored with a warning.
+- When a dancer belongs to a group, its individual animation task is paused; the group's shared task drives all its members.
 
-### Comportement technique
+### Technical Behavior
 
-1. `createChoreography()` enregistre les membres dans `choreographyGroups`, retire chaque danseur de toute autre tâche individuelle (via `dancerToGroup`) et appelle `syncAnimations()`.
-2. `syncAnimations()` arrête toutes les animations du groupe au même tick puis les redémarre simultanément (`lerpIn=0`, `lerpOut=0`). C'est le seul point où la synchronisation est explicitement forcée.
-3. Le `globalTask` surveille chaque membre de chaque groupe actif et relance son animation si elle s'est arrêtée — aucune tâche partagée distincte n'existe par groupe.
+1. `createChoreography()` records the members in `choreographyGroups`, removes each dancer from other individual tasks (`dancerToGroup`), and calls `syncAnimations()`.
+2. `syncAnimations()` stops all group animations on the same tick and restarts them simultaneously (`lerpIn=0`, `lerpOut=0`). This is the only place where synchronization is explicitly forced.
+3. The `globalTask` monitors every member of every active group and restarts its animation if it stops - there is no separate shared task per group.
 
-### Mécanisme de pause (interaction avec PlaylistManager)
+### Pause Mechanism (interaction with PlaylistManager)
 
-Pour permettre à `PlaylistManager` de changer l'animation d'un danseur ou d'un groupe sans conflit avec le global tick, deux sets de pause sont utilisés :
+To allow `PlaylistManager` to change a dancer or group animation without conflicting with the global tick, two pause sets are used:
 
-| Set | Géré par | Effet sur le global tick |
+| Set | Managed by | Effect on the global tick |
 |---|---|---|
-| `pausedDancers` | `pauseAnimationTask(id)` / `resumeAnimationTask(id)` | Le global tick ignore les danseurs solo listés dans ce set |
-| `pausedGroups` | `pauseGroupTask(groupId)` / `resumeGroupTask(groupId)` | Le global tick ignore tous les membres des groupes listés dans ce set |
+| `pausedDancers` | `pauseAnimationTask(id)` / `resumeAnimationTask(id)` | The global tick ignores solo dancers listed in this set |
+| `pausedGroups` | `pauseGroupTask(groupId)` / `resumeGroupTask(groupId)` | The global tick ignores all members of the groups listed in this set |
 
-Séquence typique dans `PlaylistManager` :
-1. `pauseAnimationTask(id)` → ajoute `id` à `pausedDancers`
-2. `changeAnimation(id, styleName)` → change l'animation (aucun conflit avec le tick)
-3. `resumeAnimationTask(id)` → retire `id` de `pausedDancers`, le global tick reprend la main
+Typical sequence in `PlaylistManager`:
+1. `pauseAnimationTask(id)` -> adds `id` to `pausedDancers`
+2. `changeAnimation(id, styleName)` -> changes the animation (no conflict with the tick)
+3. `resumeAnimationTask(id)` -> removes `id` from `pausedDancers`, and the global tick resumes control

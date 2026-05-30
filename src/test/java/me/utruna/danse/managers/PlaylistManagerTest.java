@@ -16,15 +16,15 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests unitaires pour PlaylistManager — CRUD pur, sans scheduling ni Bukkit.
+ * Unit tests for PlaylistManager - pure CRUD, without scheduling or Bukkit.
  *
- * Note : addTrack / removeTrack appellent resyncPlaylist() en interne.
- * Comme aucun runner n'est actif dans ces tests, resyncPlaylist() ne déclenche
- * aucun appel au Bukkit scheduler ni à staticDancerManager.
+ * Note: addTrack / removeTrack call resyncPlaylist() internally.
+ * Since no runner is active in these tests, resyncPlaylist() does not trigger
+ * any call to the Bukkit scheduler or to staticDancerManager.
  *
- * Non testé ici (test d'intégration séparé) :
- * - computeDelay() : appelle ModelEngineAPI statiquement → nécessite mockStatic
- * - playForPlayer / playForDancer / playForGroup : nécessitent MockBukkit + scheduler
+ * Not tested here (separate integration test):
+ * - computeDelay(): calls ModelEngineAPI statically -> requires mockStatic
+ * - playForPlayer / playForDancer / playForGroup: require MockBukkit + scheduler
  */
 class PlaylistManagerTest {
 
@@ -44,21 +44,21 @@ class PlaylistManagerTest {
         when(plugin.getDataFolder()).thenReturn(tempDir);
         when(plugin.getLogger()).thenReturn(Logger.getLogger("test-playlist"));
 
-        // Styles valides
+        // Valid styles
         DanceStyle stubStyle = new GenericDanceStyle("stub", true, "wave", 0, 0);
         when(danceManager.parseStyle("twist")).thenReturn(stubStyle);
         when(danceManager.parseStyle("disco")).thenReturn(stubStyle);
         when(danceManager.parseStyle("waltz")).thenReturn(stubStyle);
-        // Style inconnu → null
+        // Unknown style -> null
         when(danceManager.parseStyle("unknown")).thenReturn(null);
-        // Tout autre appel non-stubbé → null (comportement par défaut de Mockito)
+        // Any other unstubbed call -> null (Mockito default behavior)
 
         pm = new PlaylistManager(plugin, danceManager, staticDancerManager);
     }
 
     @AfterEach
     void tearDown() {
-        // Nettoyage du répertoire temporaire (best-effort)
+        // Best-effort cleanup of the temporary directory
         if (tempDir != null) {
             File yaml = new File(tempDir, "playlists.yml");
             yaml.delete();
@@ -100,10 +100,10 @@ class PlaylistManagerTest {
 
         boolean second = pm.createPlaylist("dup", false);
 
-        assertFalse(second, "Doit retourner false sur doublon");
+        assertFalse(second, "Must return false on duplicate IDs");
         PlaylistManager.Playlist p = pm.getPlaylists().get("dup");
-        assertTrue(p.loop,          "loop original doit être préservé");
-        assertEquals(1, p.tracks.size(), "Piste originale doit être préservée");
+        assertTrue(p.loop,          "Original loop flag must be preserved");
+        assertEquals(1, p.tracks.size(), "Original track must be preserved");
     }
 
     // =========================================================================
@@ -186,7 +186,7 @@ class PlaylistManagerTest {
     void removeTrack_indexEqualToSize_returnsFalse() {
         pm.createPlaylist("pl", true);
         pm.addTrack("pl", "twist", 1);
-        assertFalse(pm.removeTrack("pl", 1)); // taille = 1, index 1 est hors bornes
+        assertFalse(pm.removeTrack("pl", 1)); // size = 1, index 1 is out of bounds
     }
 
     @Test
@@ -219,7 +219,7 @@ class PlaylistManagerTest {
     }
 
     // =========================================================================
-    // Immutabilité des collections retournées
+    // Immutability of returned collections
     // =========================================================================
 
     @Test

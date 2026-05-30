@@ -12,8 +12,8 @@ import java.util.stream.Collectors;
 import java.util.logging.Level;
 
 /**
- * Gère le cycle de vie des danses actives pour les joueurs en ligne.
- * Charge les styles dynamiquement depuis {@code config.yml} et pilote les instances {@link Dancer}.
+ * Manages the lifecycle of active dances for online players.
+ * Loads dance styles dynamically from {@code config.yml} and manages {@link Dancer} instances.
  */
 public class DanceManager {
 
@@ -102,7 +102,7 @@ public class DanceManager {
                 try {
                     movementType = GenericDanceStyle.MovementType.valueOf(movementTypeStr.toUpperCase());
                 } catch (IllegalArgumentException e) {
-                    if (plugin != null) plugin.getLogger().warning("Type de mouvement invalide pour '" + key + "': " + movementTypeStr + ". Doit être 'static' ou 'dynamic'.");
+                    if (plugin != null) plugin.getLogger().warning("Invalid movement type for '" + key + "': " + movementTypeStr + ". Must be 'static' or 'dynamic'.");
                     movementType = GenericDanceStyle.MovementType.STATIC;
                 }
 
@@ -116,12 +116,12 @@ public class DanceManager {
                 String permission = danceSection.getString("permission", null);
                 danceConfigs.put(key.toLowerCase(), new DanceConfig(modelId, animationName, permission));
             } catch (Exception ex) {
-                if (plugin != null) plugin.getLogger().log(Level.WARNING, "Erreur en chargeant la danse '" + key + "'", ex);
+                if (plugin != null) plugin.getLogger().log(Level.WARNING, "Error loading dance '" + key + "'", ex);
             }
         }
     }
 
-    /** Retourne la permission requise pour lancer le style donné, ou {@code null} si aucun contrôle requis. */
+    /** Returns the permission required to start the given style, or {@code null} if no check is needed. */
     public String getPermission(String styleName) {
         if (styleName == null) return null;
         DanceConfig cfg = danceConfigs.get(styleName.toLowerCase(Locale.ROOT));
@@ -129,36 +129,36 @@ public class DanceManager {
     }
 
     /**
-     * Lance une danse pour un joueur.
-     * Si {@code targetName} est non nul, le skin est récupéré de manière asynchrone via Mojang ;
-     * sinon le profil du joueur connecté est utilisé directement.
-     *
-     * @param player        joueur qui danse
-     * @param style         style de danse à appliquer
-     * @param hideFromOwner si {@code true}, rend le joueur invisible pendant la danse
-     * @param targetName    pseudo du joueur dont le skin est utilisé, ou {@code null} pour le joueur lui-même
-     * @throws nothing      retourne silencieusement si {@code dance.maxConcurrent} est atteint (message envoyé au joueur)
+    * Starts a dance for a player.
+    * If {@code targetName} is non-null, the skin is fetched asynchronously from Mojang;
+    * otherwise the connected player's profile is used directly.
+    *
+    * @param player        the player who will dance
+    * @param style         the dance style to apply
+    * @param hideFromOwner if {@code true}, makes the player invisible during the dance
+    * @param targetName    username whose skin will be used, or {@code null} for the player themself
+    * @throws nothing      silently returns if {@code dance.maxConcurrent} is reached (message is sent to player)
      */
     public void startDance(Player player, DanceStyle style, boolean hideFromOwner, String targetName) {
         if (maxConcurrentDances > 0 && runningDances.size() >= maxConcurrentDances) {
-            player.sendMessage("§cTrop de danses actives, réessaie dans un moment.");
+            player.sendMessage("§cToo many active dances, try again in a moment.");
             return;
         }
         stopDance(player.getUniqueId());
 
         String styleName = style.getName().toLowerCase();
         if (plugin.isPlayerDebug(player.getUniqueId())) {
-            plugin.getLogger().info("[DEBUG] Lancement danse: " + styleName + " | Skin cible: " + targetName);
+            plugin.getLogger().info("[DEBUG] Starting dance: " + styleName + " | Target skin: " + targetName);
         }
         
         DanceConfig config = danceConfigs.get(styleName);
         if (config == null) {
-            player.sendMessage("§cErreur: Configuration manquante pour le style '" + style.getName() + "'");
+            player.sendMessage("§cError: Missing configuration for style '" + style.getName() + "'");
             return;
         }
 
         if (config.modelId == null || config.modelId.isBlank()) {
-            player.sendMessage("§cErreur: le style '" + style.getName() + "' n'a pas de 'modelId' configuré.");
+            player.sendMessage("§cError: style '" + style.getName() + "' has no configured 'modelId'.");
             plugin.getLogger().warning("Refused to start dance '" + styleName + "' because modelId is missing in config.");
             return;
         }
@@ -167,7 +167,7 @@ public class DanceManager {
             && plugin.getConfig().getBoolean("useModelEngine", false);
 
         if (!useModelEngine) {
-            player.sendMessage("§cModelEngine n'est pas activé.");
+            player.sendMessage("§cModelEngine is not enabled.");
             return;
         }
 
@@ -178,10 +178,10 @@ public class DanceManager {
                 Player current = Bukkit.getPlayer(player.getUniqueId());
                 if (current == null) return;
                 if (profile == null) {
-                    current.sendMessage("§cJoueur introuvable ou erreur Mojang: " + targetTrimmed);
+                    current.sendMessage("§cPlayer not found or Mojang error: " + targetTrimmed);
                     return;
                 }
-                if (plugin.isPlayerDebug(current.getUniqueId())) plugin.getLogger().info("[DEBUG] Profil récupéré pour " + targetTrimmed);
+                if (plugin.isPlayerDebug(current.getUniqueId())) plugin.getLogger().info("[DEBUG] Profile fetched for " + targetTrimmed);
                 Dancer dancer = new ModelEngineDancer(plugin, config.modelId, config.animationName, profile);
                 finishDanceSetup(current, dancer, style, hideFromOwner);
             });
@@ -191,7 +191,7 @@ public class DanceManager {
         // Cas 2 : Skin du joueur actuel → utiliser directement son profil
         @SuppressWarnings("deprecation")
         PlayerProfile currentProfile = player.getPlayerProfile();
-        if (plugin.isPlayerDebug(player.getUniqueId())) plugin.getLogger().info("[DEBUG] Profil du joueur actuel: " + player.getName());
+        if (plugin.isPlayerDebug(player.getUniqueId())) plugin.getLogger().info("[DEBUG] Current player profile: " + player.getName());
         Dancer dancer = new ModelEngineDancer(plugin, config.modelId, config.animationName, currentProfile);
         finishDanceSetup(player, dancer, style, hideFromOwner);
     }
@@ -247,7 +247,7 @@ public class DanceManager {
 
         try {
             dancer.spawn(origin, player);
-            if (!silent) player.sendMessage("§aDanse démarrée!");
+            if (!silent) player.sendMessage("§aDance started!");
 
             RunningDance running = new RunningDance();
             running.dancer = dancer;
@@ -269,13 +269,13 @@ public class DanceManager {
 
             runningDances.put(uuid, running);
         } catch (Exception ex) {
-            if (!silent) player.sendMessage("§cErreur lors du lancement: " + ex.getMessage());
-            plugin.getLogger().log(Level.SEVERE, "Erreur dance", ex);
+            if (!silent) player.sendMessage("§cError starting dance: " + ex.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Dance error", ex);
             player.setInvisible(false);
         }
     }
 
-    /** Arrête la danse en cours pour le joueur et restaure son état de visibilité. */
+    /** Stops the current dance for the player and restores their visibility state. */
     public void stopDance(UUID uuid) {
         if (!Bukkit.isPrimaryThread()) {
             Bukkit.getScheduler().runTask(plugin, () -> stopDance(uuid));

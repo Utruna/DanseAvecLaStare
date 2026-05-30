@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>me.utruna.danse</groupId>
-    <artifactId>DanseAvecLaStare</artifactId>
+    <artifactId>ModelDancer</artifactId>
     <version>${revision}</version>
 
-    <name>DanseAvecLaStare</name>
+    <name>ModelDancer</name>
     <url>http://www.example.com</url>
 
     <properties>

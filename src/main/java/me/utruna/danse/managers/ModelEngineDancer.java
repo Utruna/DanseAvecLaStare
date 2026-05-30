@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Implémentation {@link Dancer} basée sur ModelEngine 4.0.9.
+ * {@link Dancer} implementation based on ModelEngine 4.0.9.
  * Crée un {@code Dummy<PlayerProfile>} comme support du skin, charge et attache un {@code ActiveModel},
  * puis applique la texture sur les bones {@code PlayerLimb} via réflexion pour rester compatible
  * avec plusieurs builds de ModelEngine sans recompilation.
@@ -82,7 +82,7 @@ public class ModelEngineDancer implements Dancer {
 
         String blueprintId = getEffectiveModelId();
         if (blueprintId == null || blueprintId.isBlank()) {
-            throw new IllegalStateException("Aucun blueprint ModelEngine valide n'est disponible.");
+            throw new IllegalStateException("No valid ModelEngine blueprint is available.");
         }
 
         this.dummy = new Dummy<>(skinProfile);
@@ -91,20 +91,20 @@ public class ModelEngineDancer implements Dancer {
 
         this.modeledEntity = ModelEngineAPI.createModeledEntity(dummy);
         if (this.modeledEntity == null) {
-            throw new IllegalStateException("ModelEngine n'a pas pu créer l'entité modelée.");
+            throw new IllegalStateException("ModelEngine could not create the modeled entity.");
         }
         this.modeledEntity.registerSelf();
 
         this.activeModel = ModelEngineAPI.createActiveModel(blueprintId);
         if (this.activeModel == null) {
-            throw new IllegalStateException("Blueprint introuvable dans ModelEngine : " + blueprintId);
+            throw new IllegalStateException("Blueprint not found in ModelEngine: " + blueprintId);
         }
 
         loadAvailableAnimations();
         this.resolvedAnimationName = resolveAnimationName();
 
         debugInfo("[DEBUG] Mode de rendu=" + (useFallbackMode ? "fallback" : "standard") + ", blueprint=" + blueprintId);
-        debugInfo("[DEBUG] Skin appliqué via Dummy: " + (skinProfile != null ? skinProfile.getName() : "null"));
+        debugInfo("[DEBUG] Skin applied via Dummy: " + (skinProfile != null ? skinProfile.getName() : "null"));
 
         this.dummy.getData().getTracked().setPlayerPredicate(p -> !p.getUniqueId().equals(owner.getUniqueId()));
 
@@ -156,7 +156,7 @@ public class ModelEngineDancer implements Dancer {
 
                         if (applyTextureToBehavior(behaviorValue)) {
                             hasTextureCapableBehavior = true;
-                            debugInfo("    ✓ Skin appliqué sur " + boneName + " via " + behaviorName);
+                            debugInfo("    ✓ Skin applied on " + boneName + " via " + behaviorName);
                         } else {
                             debugInfo("    - Aucun setTexture compatible sur " + behaviorName);
                         }
@@ -285,17 +285,17 @@ public class ModelEngineDancer implements Dancer {
 
                 for (String candidate : availableAnimationNames) {
                     if (candidate.equals(modelId) || candidate.equalsIgnoreCase(modelId)) {
-                        debugWarn("AnimationName '" + animationName + "' introuvable pour le modèle '" + modelId + "'. Utilisation de '" + candidate + "' à la place.");
+                        debugWarn("AnimationName '" + animationName + "' not found for model '" + modelId + "'. Using '" + candidate + "' instead.");
                         return candidate;
                     }
                 }
 
                 String fallback = availableAnimationNames.get(0);
-                debugWarn("AnimationName '" + animationName + "' introuvable pour le modèle '" + modelId + "'. Utilisation de '" + fallback + "' à la place.");
+                debugWarn("AnimationName '" + animationName + "' not found for model '" + modelId + "'. Using '" + fallback + "' instead.");
                 return fallback;
             }
 
-            debugWarn("AnimationName '" + animationName + "' demandé, mais aucune animation n'a pu être inspectée sur le blueprint '" + modelId + "'.");
+            debugWarn("AnimationName '" + animationName + "' requested, but no animations could be inspected on blueprint '" + modelId + "'.");
             return animationName;
         }
 

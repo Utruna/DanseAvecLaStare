@@ -16,17 +16,17 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.mock;
 
 /**
- * Tests pour SkinService.
+ * Tests for SkinService.
  *
- * Limitation documentée :
- * Le chemin joueur hors ligne effectue un appel réseau réel à l'API Mojang via
- * profile.update().get(...). Ce cas est marqué @Disabled et ne doit pas être
- * exécuté dans la CI (test d'intégration, non déterministe).
+ * Documented limitation:
+ * The offline-player path performs a real network call to the Mojang API via
+ * profile.update().get(...). This case is marked @Disabled and must not be
+ * executed in CI (integration test, non-deterministic).
  *
- * Attention sur getPlayerExact dans MockBukkit :
- * MockBukkit implémente Bukkit.getServer().getPlayerExact(name). Si la version
- * de MockBukkit utilisée ne l'implémente pas fidèlement, les tests du chemin
- * "joueur en ligne" peuvent échouer avec UnsupportedOperationException.
+ * Note about getPlayerExact in MockBukkit:
+ * MockBukkit implements Bukkit.getServer().getPlayerExact(name). If the version
+ * of MockBukkit used does not implement it faithfully, the tests for the
+ * "online player" path may fail with UnsupportedOperationException.
  */
 class SkinServiceTest {
 
@@ -37,7 +37,7 @@ class SkinServiceTest {
     void setUp() {
         server = MockBukkit.mock();
         plugin = mock(Plugin.class);
-        // Le cache est statique : le vider entre chaque test pour l'isolation
+        // The cache is static: clear it between tests for isolation
         SkinService.clearCache();
         SkinService.init(2);
     }
@@ -49,7 +49,7 @@ class SkinServiceTest {
     }
 
     // =========================================================================
-    // Chemin joueur en ligne
+    // Online-player path
     // =========================================================================
 
     @Test
@@ -61,13 +61,13 @@ class SkinServiceTest {
         SkinService.fetchSkin(plugin, name, captured::set);
 
         assertNotNull(captured.get(),
-                "Le profil doit être non-null pour un joueur en ligne");
+                "The profile must be non-null for an online player");
     }
 
     @Test
     void fetchSkin_onlinePlayer_callbackCalledSynchronously() {
-        // Dans le chemin "joueur en ligne", callback.accept() est appelé directement
-        // (pas via Bukkit.getScheduler().runTask), donc sur le thread appelant.
+        // In the "online player" path, callback.accept() is called directly
+        // (not via Bukkit.getScheduler().runTask), so it runs on the caller thread.
         PlayerMock player = server.addPlayer();
         String name = player.getName();
 
@@ -77,7 +77,7 @@ class SkinServiceTest {
         SkinService.fetchSkin(plugin, name, profile -> callbackThread.set(Thread.currentThread()));
 
         assertEquals(callingThread, callbackThread.get(),
-                "Le callback doit être appelé de manière synchrone sur le thread appelant");
+                "The callback must be called synchronously on the caller thread");
     }
 
     @Test
@@ -85,10 +85,10 @@ class SkinServiceTest {
         PlayerMock player = server.addPlayer();
         String name = player.getName();
 
-        // Premier appel : met en cache
+        // First call: populates the cache
         SkinService.fetchSkin(plugin, name, p -> {});
 
-        // Deuxième appel : doit retourner le profil depuis le cache (chemin synchrone aussi)
+        // Second call: must return the profile from the cache (also synchronous path)
         AtomicReference<PlayerProfile> second = new AtomicReference<>();
         AtomicReference<Thread> callbackThread = new AtomicReference<>();
         SkinService.fetchSkin(plugin, name, p -> {
@@ -96,40 +96,40 @@ class SkinServiceTest {
             callbackThread.set(Thread.currentThread());
         });
 
-        assertNotNull(second.get(), "Le profil mis en cache doit être non-null");
+        assertNotNull(second.get(), "The cached profile must be non-null");
         assertEquals(Thread.currentThread(), callbackThread.get(),
-                "La lecture du cache doit être synchrone");
+                "Cache reads must be synchronous");
     }
 
     @Test
     void fetchSkin_cacheKeyIsLowercase_caseInsensitiveLookup() {
-        // La clé dans le cache est username.toLowerCase()
-        // Après un appel avec "Alice", un appel avec "alice" doit toucher le cache
+        // The cache key is username.toLowerCase()
+        // After a call with "Alice", a call with "alice" must hit the cache
         PlayerMock player = server.addPlayer();
         String name = player.getName(); // ex: "Player0"
 
-        // Premier appel (minuscule) pour peupler le cache
+        // First call (lowercase) to populate the cache
         SkinService.fetchSkin(plugin, name.toLowerCase(), p -> {});
 
         AtomicReference<Thread> secondCallbackThread = new AtomicReference<>();
         SkinService.fetchSkin(plugin, name.toUpperCase(), p ->
                 secondCallbackThread.set(Thread.currentThread()));
 
-        // Si le cache est touché, le callback est synchrone (même thread)
+        // If the cache is hit, the callback is synchronous (same thread)
         assertEquals(Thread.currentThread(), secondCallbackThread.get(),
-                "Lookup avec casse différente doit toucher le cache (synchrone)");
+                "Lookup with different casing must hit the cache (synchronous)");
     }
 
     // =========================================================================
-    // Chemin joueur hors ligne — nécessite réseau Mojang
+    // Offline-player path - requires Mojang network access
     // =========================================================================
 
     @Disabled("Requires Mojang API - integration test only")
     @Test
     void fetchSkin_offlinePlayer_callsMojangApiAsync() {
-        // Ce test est intentionnellement désactivé.
-        // Il ferait un appel réseau réel à l'API d'authentification Mojang via
+        // This test is intentionally disabled.
+        // It would make a real network call to the Mojang authentication API via
         // Bukkit.createPlayerProfile(username).update().get(timeout, SECONDS).
-        // Non déterministe en CI (latence réseau, rate-limiting, username inexistant).
+        // Non-deterministic in CI (network latency, rate limiting, missing username).
     }
 }

@@ -1,87 +1,87 @@
 # Playlists
 
-Le système de playlists permet de programmer des séquences d'animations avec répétitions sur un joueur, un danseur statique ou un groupe chorégraphique.
+The playlist system lets you sequence dance animations with repeats on a player, a static dancer, or a choreography group.
 
 ---
 
 ## Concepts
 
-- **Playlist** : une liste ordonnée de pistes, jouée en boucle (`loop`) ou une seule fois (`once`).
-- **Piste (track)** : un style de danse + un nombre de répétitions. La durée d'une répétition est calculée automatiquement depuis la longueur de l'animation dans ModelEngine.
-- **Cible** : `player`, `dancer` (danseur statique) ou `group` (groupe chorégraphique).
+- **Playlist**: an ordered list of tracks, played in a loop (`loop`) or once (`once`).
+- **Track**: a dance style plus a repeat count. The duration of one repeat is computed automatically from the animation length in ModelEngine.
+- **Target**: `player`, `dancer` (static dancer), or `group` (choreography group).
 
 ---
 
-## Commandes
+## Commands
 
-### Gestion des playlists
-
-```
-/danse playlist create <id> [loop|once]     Crée une playlist (en boucle par défaut)
-/danse playlist add <id> <style> <rép>      Ajoute une piste (style × N répétitions)
-/danse playlist remove <id> <index>         Supprime la piste à l'index donné (commence à 0)
-/danse playlist delete <id>                 Supprime la playlist et arrête toutes ses lectures actives
-/danse playlist info <id>                   Affiche les pistes avec leur index
-/danse playlist list                        Liste toutes les playlists définies
-```
-
-### Lecture
+### Playlist management
 
 ```
-/danse playlist set <id> player [pseudo]   Lance sur un joueur (soi-même si pseudo omis)
-/danse playlist set <id> dancer <dancerId> Lance sur un danseur statique
-/danse playlist set <id> group  <groupId>  Lance sur un groupe chorégraphique
+/danse playlist create <id> [loop|once]     Create a playlist (loops by default)
+/danse playlist add <id> <style> <repetitions>  Add a track (style × N repeats)
+/danse playlist remove <id> <index>         Remove the track at the given index (starts at 0)
+/danse playlist delete <id>                 Delete the playlist and stop all active playback
+/danse playlist info <id>                   Show the tracks with their indexes
+/danse playlist list                        List all defined playlists
 ```
 
-### Arrêt
+### Playback
 
 ```
-/danse playlist stop player [pseudo]        Arrête la playlist d'un joueur
-/danse playlist stop dancer <dancerId>      Arrête la playlist d'un danseur
-/danse playlist stop group  <groupId>       Arrête la playlist d'un groupe
+/danse playlist set <id> player [playerName]   Start on a player (self if omitted)
+/danse playlist set <id> dancer <dancerId>     Start on a static dancer
+/danse playlist set <id> group <groupId>       Start on a choreography group
 ```
 
-### Supervision
+### Stop
 
 ```
-/danse playlist active                      Affiche toutes les lectures en cours (joueurs, danseurs, groupes)
-/danse playlist debug                       Active/désactive les logs de diagnostic playlist dans la console
+/danse playlist stop player [playerName]       Stop a player's playlist
+/danse playlist stop dancer <dancerId>          Stop a dancer's playlist
+/danse playlist stop group <groupId>            Stop a group's playlist
 ```
 
-- Toutes ces commandes sont utilisables depuis la console.
-- La complétion par Tab fonctionne sur les IDs de playlists, styles, joueurs, danseurs et groupes.
+### Monitoring
+
+```
+/danse playlist active                          Show all active playback (players, dancers, groups)
+/danse playlist debug                           Enable or disable playlist debug logs in the console
+```
+
+- All of these commands can be used from the console.
+- Tab completion works for playlist IDs, styles, players, dancers, and groups.
 
 ---
 
-## Exemple d'utilisation
+## Usage Example
 
 ```
-# Créer une playlist en boucle
+# Create a looping playlist
 /danse playlist create show loop
 
-# Ajouter des pistes
+# Add tracks
 /danse playlist add show twist 2
 /danse playlist add show dj 1
 /danse playlist add show salsa 3
 
-# Vérifier le contenu
+# Verify the content
 /danse playlist info show
-#   #0 → twist [×2 rép.]
-#   #1 → dj    [×1 rép.]
-#   #2 → salsa [×3 rép.]
+#   #0 → twist [×2 reps]
+#   #1 → dj    [×1 reps]
+#   #2 → salsa [×3 reps]
 
-# Lancer sur un groupe
-/danse playlist set show group scene_principale
+# Start on a group
+/danse playlist set show group main_scene
 
-# Arrêter
-/danse playlist stop group scene_principale
+# Stop
+/danse playlist stop group main_scene
 ```
 
 ---
 
-## Persistance
+## Persistence
 
-Les playlists sont sauvegardées dans `plugins/DanseAvecLaStare/playlists.yml`.
+Playlists are saved in `plugins/ModelDancer/playlists.yml`.
 
 ```yaml
 playlists:
@@ -96,16 +96,16 @@ playlists:
         repetitions: 3
 ```
 
-- Les playlists sont restaurées au redémarrage mais les lectures actives ne le sont pas (à relancer manuellement).
-- `deletePlaylist` arrête immédiatement toutes les lectures actives liées à cette playlist.
+- Playlists are restored on restart, but active playback is not (it must be started again manually).
+- `deletePlaylist` immediately stops all active playback linked to that playlist.
 
 ---
 
-## Comportement technique
+## Technical Behavior
 
-- La durée d'une répétition est calculée via `BlueprintAnimation.getLength()` (retourne des secondes) × 20 → ticks.
-- Le `PlaylistRunner` enchaîne les pistes avec `BukkitScheduler.runTaskLater()` ; chaque transition planifie la piste suivante à la fin de la durée courante.
-- Pour les groupes, `changeGroupAnimation()` appelle `playAnimation()` sur tous les membres dans le même tick → synchronisation maintenue entre pistes.
-- **Pause/resume avec le global tick** : avant chaque changement d'animation, `PlaylistManager` appelle `pauseAnimationTask(id)` ou `pauseGroupTask(groupId)`. Ces méthodes **n'annulent plus de `BukkitTask`** — elles ajoutent l'ID dans un set de pause (`pausedDancers` ou `pausedGroups`) consulté par le `globalTask` de `StaticDancerManager` à chaque tick. `resumeAnimationTask` / `resumeGroupTask` retirent simplement l'ID du set. Cela évite la création et l'annulation répétées de tâches Bukkit lors des transitions.
-- Si une playlist en `loop` se termine, elle repart automatiquement depuis la première piste.
-- `/danse stop` arrête à la fois la playlist du joueur et sa danse ME4.
+- The duration of a repeat is calculated via `BlueprintAnimation.getLength()` (returns seconds) × 20 → ticks.
+- `PlaylistRunner` chains tracks with `BukkitScheduler.runTaskLater()`; each transition schedules the next track at the end of the current duration.
+- For groups, `changeGroupAnimation()` calls `playAnimation()` on all members in the same tick, keeping tracks synchronized.
+- **Pause/resume with the global tick**: before each animation change, `PlaylistManager` calls `pauseAnimationTask(id)` or `pauseGroupTask(groupId)`. These methods no longer cancel any `BukkitTask`; they add the ID to a pause set (`pausedDancers` or `pausedGroups`) that `StaticDancerManager` checks on every tick through its `globalTask`. `resumeAnimationTask` / `resumeGroupTask` simply remove the ID from the set. This avoids repeated Bukkit task creation and cancellation during transitions.
+- If a looping playlist finishes, it automatically starts again from the first track.
+- `/danse stop` stops both the player's playlist and their ME4 dance.

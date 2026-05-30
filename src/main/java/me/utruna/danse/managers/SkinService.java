@@ -10,25 +10,25 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
- * Service de récupération des skins joueur via l'API Mojang.
+ * Player skin retrieval service through the Mojang API.
  *
- * <p>Les profils résolus sont mis en cache pour toute la session ({@link #clearCache()} peut
- * forcer un rechargement, par exemple lors d'un {@code /danse reload}).
+ * <p>Resolved profiles are cached for the entire session ({@link #clearCache()} can
+ * force a reload, for example during {@code /danse reload}).
  *
- * <p>Les appels Mojang (joueurs hors ligne) s'exécutent sur un pool de threads borné
- * ({@code DanseSkinFetcher-N}), dont la taille est lue depuis {@code skinFetcher.maxThreads}
- * dans {@code config.yml}. Appeler {@link #init(int)} depuis {@code onEnable} et
- * {@link #shutdown()} depuis {@code onDisable} pour gérer le cycle de vie du pool.
+ * <p>Mojang calls (offline players) run on a bounded thread pool
+ * ({@code DanseSkinFetcher-N}), sized from {@code skinFetcher.maxThreads}
+ * in {@code config.yml}. Call {@link #init(int)} from {@code onEnable} and
+ * {@link #shutdown()} from {@code onDisable} to manage the pool lifecycle.
  *
- * <p>Le callback passé à {@link #fetchSkin} est <strong>toujours</strong> appelé sur le
- * thread principal Bukkit, que le profil provienne du cache, d'un joueur en ligne ou d'un
- * appel Mojang async.
+ * <p>The callback passed to {@link #fetchSkin} is <strong>always</strong> called on the
+ * Bukkit main thread, whether the profile comes from the cache, an online player, or an
+ * async Mojang call.
  */
 public class SkinService {
 
     private static final AtomicInteger THREAD_COUNTER = new AtomicInteger(0);
 
-    /** Cache session des profils déjà résolus (pseudo lowercase → profil). */
+    /** Session cache for already resolved profiles (lowercase username -> profile). */
     @SuppressWarnings("deprecation")
     private static final ConcurrentHashMap<String, PlayerProfile> CACHE = new ConcurrentHashMap<>();
 
@@ -43,9 +43,9 @@ public class SkinService {
     }
 
     /**
-     * Initialise (ou réinitialise) le pool de threads avec la taille donnée.
-     * Doit être appelé depuis {@code onEnable} après le chargement de la config.
-     * L'ancien pool (s'il existe) est arrêté proprement avant remplacement.
+    * Initializes (or reinitializes) the thread pool with the given size.
+    * Must be called from {@code onEnable} after loading the config.
+    * The previous pool (if any) is shut down cleanly before replacement.
      */
     public static void init(int maxThreads) {
         ExecutorService old = executor;
@@ -54,8 +54,8 @@ public class SkinService {
     }
 
     /**
-     * Arrête le pool de threads proprement.
-     * Doit être appelé depuis {@code onDisable} pour libérer les ressources.
+    * Shuts down the thread pool cleanly.
+    * Must be called from {@code onDisable} to release resources.
      */
     public static void shutdown() {
         ExecutorService old = executor;
@@ -63,28 +63,28 @@ public class SkinService {
         if (old != null) old.shutdown();
     }
 
-    /** Vide le cache (appelé lors d'un /danse reload). */
+    /** Clears the cache (called during a /danse reload). */
     public static void clearCache() {
         CACHE.clear();
     }
 
     /**
-     * Récupère le profil skin d'un joueur de manière asynchrone.
-     * Priorité : cache → joueur en ligne → appel Mojang (pool borné, timeout configurable).
-     * Le callback est toujours appelé sur le thread principal Bukkit.
+    * Retrieves a player's skin profile asynchronously.
+    * Priority: cache -> online player -> Mojang call (bounded pool, configurable timeout).
+    * The callback is always called on the Bukkit main thread.
      */
     @SuppressWarnings("deprecation")
     public static void fetchSkin(Plugin plugin, String username, Consumer<PlayerProfile> callback) {
         String key = username.toLowerCase();
 
-        // Cache : profil déjà résolu
+        // Cache: profile already resolved
         PlayerProfile cached = CACHE.get(key);
         if (cached != null) {
             callback.accept(cached);
             return;
         }
 
-        // Joueur en ligne : profil disponible immédiatement
+        // Online player: profile available immediately
         Player online = Bukkit.getPlayerExact(username);
         if (online != null) {
             PlayerProfile profile = online.getPlayerProfile();
@@ -93,10 +93,10 @@ public class SkinService {
             return;
         }
 
-        // Joueur hors ligne : appel Mojang sur pool borné
+        // Offline player: Mojang call on bounded pool
         ExecutorService exec = executor;
         if (exec == null || exec.isShutdown()) {
-            plugin.getLogger().warning("[SkinService] Executor non disponible, impossible de charger le skin de " + username);
+            plugin.getLogger().warning("[SkinService] Executor unavailable, cannot load skin for " + username);
             callback.accept(null);
             return;
         }
@@ -112,12 +112,12 @@ public class SkinService {
                     CACHE.put(key, updated);
                     result = updated;
                 } else {
-                    plugin.getLogger().warning("[SkinService] Profil sans texture pour: " + username);
+                    plugin.getLogger().warning("[SkinService] Profile without texture for: " + username);
                 }
             } catch (TimeoutException e) {
-                plugin.getLogger().warning("[SkinService] Timeout Mojang pour " + username);
+                plugin.getLogger().warning("[SkinService] Mojang timeout for " + username);
             } catch (Exception e) {
-                plugin.getLogger().warning("[SkinService] Erreur Mojang pour " + username + ": " + e.getMessage());
+                plugin.getLogger().warning("[SkinService] Mojang error for " + username + ": " + e.getMessage());
             }
             final PlayerProfile finalResult = result;
             Bukkit.getScheduler().runTask(plugin, () -> callback.accept(finalResult));

@@ -23,18 +23,17 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 /**
- * Gère les danseurs statiques (NPCs ModelEngine positionnés dans le monde) et les groupes
- * de chorégraphie.
+ * Manages static dancers (ModelEngine NPCs positioned in the world) and choreography groups.
  *
- * <p><b>Global tick :</b> un unique {@code BukkitTask} ({@code globalTask}, 1 tick/cycle) gère
- * toutes les animations — aucune tâche individuelle par danseur ni par groupe. Il itère sur
- * {@code activeDancers} (danseurs solo) et sur {@code choreographyGroups} (groupes) et relance
- * les animations qui se sont arrêtées.
+ * <p><b>Global tick:</b> a single {@code BukkitTask} ({@code globalTask}, 1 tick/cycle) manages
+ * all animations - no individual task per dancer or group. It iterates over
+ * {@code activeDancers} (solo dancers) and {@code choreographyGroups} (groups) and restarts
+ * animations that have stopped.
  *
- * <p><b>Pause/resume :</b> {@code pausedDancers} et {@code pausedGroups} sont deux sets consultés
- * à chaque tick du global tick. Ajouter un ID à un set suspend son animation sans annuler de
- * tâche Bukkit. {@link PlaylistManager} utilise ces sets via {@link #pauseAnimationTask} et
- * {@link #pauseGroupTask} pour changer les animations sans conflit.
+ * <p><b>Pause/resume:</b> {@code pausedDancers} and {@code pausedGroups} are two sets checked
+ * on every global tick. Adding an ID to a set pauses its animation without canceling a
+ * Bukkit task. {@link PlaylistManager} uses these sets through {@link #pauseAnimationTask} and
+ * {@link #pauseGroupTask} to change animations without conflict.
  */
 public class StaticDancerManager {
 
@@ -85,7 +84,7 @@ public class StaticDancerManager {
         ConfigurationSection danceSection =
                 plugin.getConfig().getConfigurationSection("dances." + danceStyleName);
         if (danceSection == null) {
-            plugin.getLogger().warning("[StaticDancer] Style introuvable dans la config: " + danceStyleName);
+            plugin.getLogger().warning("[StaticDancer] Style not found in config: " + danceStyleName);
             return false;
         }
 
@@ -99,7 +98,7 @@ public class StaticDancerManager {
                 : (modelId != null ? modelId.trim() : null);
 
         if (blueprintId == null || blueprintId.isBlank()) {
-            plugin.getLogger().warning("[StaticDancer] Aucun modelId configuré pour le style: " + danceStyleName);
+                plugin.getLogger().warning("[StaticDancer] No modelId configured for style: " + danceStyleName);
             return false;
         }
 
@@ -116,7 +115,7 @@ public class StaticDancerManager {
 
             ModeledEntity modeledEntity = ModelEngineAPI.createModeledEntity(dummy);
             if (modeledEntity == null) {
-                plugin.getLogger().warning("[StaticDancer] ModelEngine n'a pas pu créer l'entité pour: " + id);
+                plugin.getLogger().warning("[StaticDancer] ModelEngine could not create the entity for: " + id);
                 return false;
             }
             modeledEntity.registerSelf();
@@ -124,7 +123,7 @@ public class StaticDancerManager {
             ActiveModel activeModel = ModelEngineAPI.createActiveModel(blueprintId);
             if (activeModel == null) {
                 modeledEntity.destroy();
-                plugin.getLogger().warning("[StaticDancer] Blueprint introuvable dans ModelEngine: " + blueprintId);
+                plugin.getLogger().warning("[StaticDancer] Blueprint not found in ModelEngine: " + blueprintId);
                 return false;
             }
 
@@ -147,15 +146,15 @@ public class StaticDancerManager {
             entry.skinName = skinName;
             entry.location = location.clone();
 
-            // Le global tick gère toutes les animations (individuel et groupe).
+            // The global tick handles all animations (individual and group).
 
             activeDancers.put(id, entry);
             saveDancer(id, entry);
-            plugin.getLogger().info("[StaticDancer] Danseur '" + id + "' apparu (style=" + danceStyleName + ", blueprint=" + blueprintId + ")");
+            plugin.getLogger().info("[StaticDancer] Dancer '" + id + "' spawned (style=" + danceStyleName + ", blueprint=" + blueprintId + ")");
             return true;
 
         } catch (Exception e) {
-            plugin.getLogger().log(Level.SEVERE, "[StaticDancer] Erreur lors du spawn de '" + id + "'", e);
+            plugin.getLogger().log(Level.SEVERE, "[StaticDancer] Error while spawning '" + id + "'", e);
             return false;
         }
     }
@@ -164,10 +163,10 @@ public class StaticDancerManager {
         StaticDancerEntry entry = activeDancers.remove(id);
         if (entry == null) return false;
 
-        // Notifier le PlaylistManager avant de détruire
+        // Notify PlaylistManager before destroying
         if (playlistManager != null) playlistManager.onDancerRemoved(id);
 
-        // Retirer du groupe de chorégraphie si applicable
+        // Remove from choreography group if applicable
         String groupId = dancerToGroup.remove(id);
         if (groupId != null) {
             Set<String> groupIds = choreographyGroups.get(groupId);
@@ -184,16 +183,16 @@ public class StaticDancerManager {
         try {
             destroyEntry(entry);
         } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur lors de la destruction de '" + id + "'", e);
+            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Error while destroying '" + id + "'", e);
         }
         removeDancerFromFile(id);
-        plugin.getLogger().info("[StaticDancer] Danseur '" + id + "' supprimé.");
+        plugin.getLogger().info("[StaticDancer] Dancer '" + id + "' deleted.");
         return true;
     }
 
     /**
-     * Change le style de danse d'un danseur statique et persiste le changement.
-     * Gère automatiquement la pause/reprise de la tâche (individuelle ou de groupe).
+    * Changes a static dancer's style and persists the change.
+    * Automatically handles task pause/resume (individual or group).
      */
     public boolean changeDancerStyle(String id, String styleName) {
         StaticDancerEntry entry = activeDancers.get(id);
@@ -375,8 +374,8 @@ public class StaticDancerManager {
         for (Map.Entry<String, StaticDancerEntry> e : activeDancers.entrySet()) {
             try {
                 destroyEntry(e.getValue());
-            } catch (Exception ex) {
-                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur nettoyage de '" + e.getKey() + "'", ex);
+                } catch (Exception ex) {
+                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Error cleaning up '" + e.getKey() + "'", ex);
             }
         }
         activeDancers.clear();
@@ -397,7 +396,7 @@ public class StaticDancerManager {
             if (!activeDancers.containsKey(id)) return false;
         }
 
-        // Dissoudre l'ancien groupe s'il existait
+        // Disband the old group if it existed
         disbandGroupInternal(groupId);
 
         Set<String> ids = new LinkedHashSet<>(dancerIds);
@@ -522,8 +521,8 @@ public class StaticDancerManager {
                     entry.activeModel.getAnimationHandler().playAnimation(
                             entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
                 }
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshForPlayer pour '" + id + "'", e);
+                } catch (Exception e) {
+                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Error refreshForPlayer for '" + id + "'", e);
             }
         }
     }
@@ -606,7 +605,7 @@ public class StaticDancerManager {
      */
     public void pauseAnimationTask(String id) {
         pausedDancers.add(id);
-        dbg("pauseAnimationTask('" + id + "') → marqué en pause");
+        dbg("pauseAnimationTask('" + id + "') -> marked as paused");
     }
 
     /**
@@ -620,9 +619,9 @@ public class StaticDancerManager {
     public void resumeAnimationTask(String id) {
         if (activeDancers.containsKey(id)) {
             pausedDancers.remove(id);
-            dbg("resumeAnimationTask('" + id + "') → démarqué");
+            dbg("resumeAnimationTask('" + id + "') -> unpaused");
         } else {
-            dbg("resumeAnimationTask('" + id + "') → ignoré (danseur inexistant)");
+            dbg("resumeAnimationTask('" + id + "') -> ignored (dancer not found)");
         }
     }
 
@@ -636,7 +635,7 @@ public class StaticDancerManager {
      */
     public void pauseGroupTask(String groupId) {
         pausedGroups.add(groupId);
-        dbg("pauseGroupTask('" + groupId + "') → marqué en pause");
+        dbg("pauseGroupTask('" + groupId + "') -> marked as paused");
     }
 
     /**
@@ -649,11 +648,11 @@ public class StaticDancerManager {
      */
     public void resumeGroupTask(String groupId) {
         if (!choreographyGroups.containsKey(groupId)) {
-            dbg("resumeGroupTask('" + groupId + "') → ignoré (groupe inexistant)");
+            dbg("resumeGroupTask('" + groupId + "') -> ignored (group missing)");
             return;
         }
         pausedGroups.remove(groupId);
-        dbg("resumeGroupTask('" + groupId + "') → démarqué");
+        dbg("resumeGroupTask('" + groupId + "') -> unpaused");
     }
 
     // -------------------------------------------------------------------------
@@ -701,13 +700,13 @@ public class StaticDancerManager {
             double scale = ds.getDouble("scale", 1.0);
 
             if (worldName == null || style == null) {
-                plugin.getLogger().warning("[StaticDancer] Entrée invalide dans le fichier, ignorée: " + id);
+                plugin.getLogger().warning("[StaticDancer] Invalid entry in file, ignored: " + id);
                 continue;
             }
 
             World world = Bukkit.getWorld(worldName);
             if (world == null) {
-                plugin.getLogger().warning("[StaticDancer] Monde '" + worldName + "' non chargé, danseur ignoré: " + id);
+                plugin.getLogger().warning("[StaticDancer] World '" + worldName + "' not loaded, dancer ignored: " + id);
                 continue;
             }
 
@@ -750,15 +749,15 @@ public class StaticDancerManager {
             if (validIds.isEmpty()) continue;
 
             if (validIds.size() < ids.size()) {
-                plugin.getLogger().warning("[Choreo] Groupe '" + groupId + "': "
-                        + (ids.size() - validIds.size()) + " danseur(s) introuvable(s), ignoré(s).");
+                plugin.getLogger().warning("[Choreo] Group '" + groupId + "': "
+                    + (ids.size() - validIds.size()) + " dancer(s) not found, ignored.");
             }
 
             if (createChoreography(groupId, validIds)) restored++;
         }
 
         if (restored > 0) {
-            plugin.getLogger().info("[Choreo] " + restored + " groupe(s) de chorégraphie restauré(s).");
+            plugin.getLogger().info("[Choreo] " + restored + " choreography group(s) restored.");
         }
     }
 
@@ -777,7 +776,7 @@ public class StaticDancerManager {
         try {
             yaml.save(file);
         } catch (IOException e) {
-            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Impossible de sauvegarder le fichier", e);
+            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Failed to save file", e);
         }
     }
 
@@ -789,7 +788,7 @@ public class StaticDancerManager {
         try {
             yaml.save(file);
         } catch (IOException e) {
-            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Impossible de mettre à jour le fichier", e);
+            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Failed to update file", e);
         }
     }
 
@@ -802,7 +801,7 @@ public class StaticDancerManager {
         try {
             yaml.save(file);
         } catch (IOException e) {
-            plugin.getLogger().log(Level.WARNING, "[Choreo] Impossible de sauvegarder choreography.yml", e);
+            plugin.getLogger().log(Level.WARNING, "[Choreo] Failed to save choreography.yml", e);
         }
     }
 
@@ -828,7 +827,7 @@ public class StaticDancerManager {
         Set<String> ids = choreographyGroups.get(groupId);
         if (ids == null || ids.isEmpty()) return;
 
-        // Étape 1 : stop de toutes les animations
+        // Step 1: stop all animations
         for (String id : ids) {
             StaticDancerEntry entry = activeDancers.get(id);
             if (entry == null || entry.activeModel == null || entry.resolvedAnimation == null) continue;
@@ -841,7 +840,7 @@ public class StaticDancerManager {
             }
         }
 
-        // Étape 2 : restart de toutes les animations dans le même tick
+        // Step 2: restart all animations in the same tick
         for (String id : ids) {
             StaticDancerEntry entry = activeDancers.get(id);
             if (entry == null || entry.activeModel == null || entry.resolvedAnimation == null) continue;
@@ -881,7 +880,7 @@ public class StaticDancerManager {
         try {
             ActiveModel newModel = ModelEngineAPI.createActiveModel(newBlueprintId);
             if (newModel == null) {
-                plugin.getLogger().warning("[StaticDancer] Blueprint introuvable pour swap: " + newBlueprintId);
+                plugin.getLogger().warning("[StaticDancer] Blueprint not found for swap: " + newBlueprintId);
                 return false;
             }
 
@@ -893,7 +892,7 @@ public class StaticDancerManager {
             // Recréer un ModeledEntity sur le MÊME Dummy (rotation préservée)
             ModeledEntity newEntity = ModelEngineAPI.createModeledEntity(entry.dummy);
             if (newEntity == null) {
-                plugin.getLogger().warning("[StaticDancer] Impossible de recréer l'entité pour swap: " + newBlueprintId);
+                plugin.getLogger().warning("[StaticDancer] Failed to recreate entity for swap: " + newBlueprintId);
                 return false;
             }
             newEntity.registerSelf();
@@ -904,10 +903,10 @@ public class StaticDancerManager {
             entry.activeModel        = newModel;
             entry.currentBlueprintId = newBlueprintId;
             if (entry.scale != 1.0) newModel.setScale(entry.scale);
-            dbg("swapModel → blueprint='" + newBlueprintId + "' (dummy recyclé)");
+            dbg("swapModel -> blueprint='" + newBlueprintId + "' (recycled dummy)");
             return true;
         } catch (Exception e) {
-            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur swap modèle → " + newBlueprintId, e);
+            plugin.getLogger().log(Level.WARNING, "[StaticDancer] Error swapping model -> " + newBlueprintId, e);
             return false;
         }
     }
@@ -975,7 +974,7 @@ public class StaticDancerManager {
         if (!available.isEmpty()) {
             String fallback = available.get(0);
             if (requestedName != null && !requestedName.isBlank()) {
-                plugin.getLogger().warning("[StaticDancer] Animation '" + requestedName + "' introuvable sur '" + blueprintId + "'. Utilisation de '" + fallback + "'.");
+                plugin.getLogger().warning("[StaticDancer] Animation '" + requestedName + "' not found on '" + blueprintId + "'. Using '" + fallback + "'.");
             }
             return fallback;
         }
@@ -999,7 +998,7 @@ public class StaticDancerManager {
                 } catch (Exception ignored) {}
             }
         } catch (Exception e) {
-            plugin.getLogger().warning("[StaticDancer] Erreur applySkin: " + e.getMessage());
+            plugin.getLogger().warning("[StaticDancer] Error applySkin: " + e.getMessage());
         }
     }
 

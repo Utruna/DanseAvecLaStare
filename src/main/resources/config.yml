@@ -1,19 +1,19 @@
-# Configuration du plugin DanseAvecLaStare
-# Cette version sera mise à jour automatiquement lors du déploiement de nouvelles versions
+# Configuration for the ModelDancer plugin
+# This version is updated automatically when new releases are deployed
 configVersion: "1.4"
 
 useModelEngine: true
 
-# Mode de secours pour les clients avec shaders / packs fragiles.
-# true = charge un blueprint alternatif plus simple et applique les textures de façon dynamique.
+# Fallback mode for clients with shaders / fragile packs.
+# true = loads a simpler fallback blueprint and applies textures dynamically.
 modelEngine:
   useFallbackMode: false
   fallbackModelId: joueur_fallback
   renderRadius: 256
 
 
-# Configuration des dances - Chaque style de danse est défini ici
-# Ajoute une nouvelle danse sans modifier le code Java, juste la config !
+# Dance configuration - each dance style is defined here
+# Add a new dance without changing Java code, just edit the config.
 dances:
   twist:
     displayName: "Twist"
@@ -51,24 +51,24 @@ dances:
     animationName: dance
     movementType: dynamic
 
-# Durée par défaut de /danse preview <style> si aucune durée n'est précisée en argument (en ticks, 20 ticks = 1 seconde).
+# Default duration for /danse preview <style> when no duration is provided (in ticks, 20 ticks = 1 second).
 preview:
   defaultDurationTicks: 100
 
-# Paramètres du pool de threads utilisé pour les appels à l'API Mojang (récupération des skins).
+# Thread pool settings used for Mojang API calls (skin fetching).
 skinFetcher:
-  # Nombre maximum de threads dédiés aux requêtes Mojang. Augmenter si plusieurs dizaines de skins
-  # sont chargés simultanément au démarrage ; garder bas sur des serveurs peu chargés.
+  # Maximum number of threads dedicated to Mojang requests. Increase if dozens of skins
+  # are loaded simultaneously at startup; keep it low on lightly loaded servers.
   maxThreads: 4
-  # Délai maximal d'attente d'une réponse Mojang avant abandon (en secondes).
-  # En cas de timeout, le skin est ignoré et la danse est annulée pour ce joueur.
+  # Maximum wait time for a Mojang response before giving up (in seconds).
+  # On timeout, the skin is ignored and the dance is cancelled for that player.
   timeoutSeconds: 5
 
-# Limites et comportements des danses joueur.
+# Player dance limits and behavior.
 dance:
-  # Nombre maximal de danses actives en parallèle sur le serveur (joueurs + previews).
-  # Chaque danse alloue 1 Dummy, 1 ModeledEntity et 1 ActiveModel dans ModelEngine.
-  # Mettre à 0 pour désactiver la limite.
+  # Maximum number of active dances in parallel on the server (players + previews).
+  # Each dance allocates 1 Dummy, 1 ModeledEntity, and 1 ActiveModel in ModelEngine.
+  # Set to 0 to disable the limit.
   maxConcurrent: 0
 
 worlds:

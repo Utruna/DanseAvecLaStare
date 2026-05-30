@@ -14,12 +14,12 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.UUID;
 
 /**
- * Écoute les événements joueurs pour stopper automatiquement la danse à la déconnexion
- * et rafraîchir les danseurs statiques à la reconnexion.
+ * Listens to player events to stop dancing automatically on logout
+ * and refresh static dancers on reconnect.
  *
- * <p>Au join, {@link me.utruna.danse.managers.StaticDancerManager#refreshForPlayer} est
- * planifié avec un délai de 40 ticks. Les joins rapprochés sont coalesés : si plusieurs
- * joueurs rejoignent dans la même fenêtre de 40 ticks, un seul refresh est exécuté.
+ * <p>On join, {@link me.utruna.danse.managers.StaticDancerManager#refreshForPlayer} is
+ * scheduled with a 40 tick delay. Nearby joins are coalesced: if several players join
+ * within the same 40 tick window, only one refresh is executed.
  */
 public class PlayerListener implements Listener {
 
@@ -39,8 +39,8 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        // Coalesce : si plusieurs joueurs rejoignent dans la même fenêtre de 40 ticks,
-        // un seul refreshAll est exécuté au lieu d'en empiler un par joueur.
+        // Coalesce: if several players join within the same 40 tick window,
+        // only one refreshAll runs instead of one per player.
         final Player joiningPlayer = event.getPlayer();
         if (pendingRefresh == null || pendingRefresh.isCancelled()) {
             pendingRefresh = Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -53,8 +53,8 @@ public class PlayerListener implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
-        // Arrêter la playlist en premier (elle appelle stopDance en interne si active),
-        // puis stopDance directement pour couvrir le cas sans playlist.
+        // Stop the playlist first (it calls stopDance internally if active),
+        // then call stopDance directly to cover the case without a playlist.
         playlistManager.stopForPlayer(uuid);
         danceManager.stopDance(uuid);
     }

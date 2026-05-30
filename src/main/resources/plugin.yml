@@ -1,53 +1,53 @@
 main: me.utruna.danse.DanseAvecLaStare
 version: 2.3.0
-name: DanseAvecLaStare
+name: ModelDancer
 author: Utruna
 api-version: 1.21
 softdepend: [ModelEngine]
 commands:
   danse:
-    description: Lance ou arrête une danse
+    description: Start or stop a dance
     usage: /danse [style|preview <style>|npc <spawn|move|delete|list|highlight|resize|style>|choreo|playlist|list|stop|reload|debug]
 
 permissions:
   danse.player:
-    description: Accès aux commandes de base (list, stop)
+    description: Access to basic commands (list, stop)
     default: true
   danse.skin:
-    description: Utiliser le skin d'un autre joueur
+    description: Use another player's skin
     default: false
   danse.playlist.play:
-    description: Lancer une playlist publique sur soi-même
+    description: Start a public playlist on yourself
     default: true
   danse.static:
-    description: Gérer les danseurs statiques
+    description: Manage static dancers
     default: false
   danse.choreo:
-    description: Gérer les chorégraphies
+    description: Manage choreography groups
     default: false
   danse.playlist:
-    description: Gérer et lancer les playlists (staff)
+    description: Manage and start playlists (staff)
     default: false
   danse.staff:
-    description: Accès au menu staff (gestion NPCs, playlists, chorégraphies)
+    description: Access to the staff menu (NPC, playlist, and choreography management)
     default: false
   danse.use:
-    description: Utiliser les commandes joueur (styles, stop, list, preview)
+    description: Use player commands (styles, stop, list, preview)
     default: true
   danse.admin:
-    description: Commandes admin (reload, choreo)
+    description: Admin commands (reload, choreo)
     default: op
   danse.debug:
-    description: Accès aux commandes de diagnostic
+    description: Access to diagnostic commands
     default: false
   danse.style:
-    description: "Parent pour permissions par style (ex: danse.style.twist)"
+    description: "Parent permission for style-specific permissions (e.g. danse.style.twist)"
     default: false
     children:
       danse.style.twist: true
       danse.style.dj: true
   danse.*:
-    description: Accès total au plugin
+    description: Full access to the plugin
     default: op
     children:
       danse.player: true

@@ -5,12 +5,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import java.util.List;
 
-/** Utilitaires de contrôle d'accès : permissions et restrictions par monde. */
+/** Access-control utilities: permissions and world restrictions. */
 public class DanseGuard {
 
     /**
-     * Vérifie si le sender possède le nœud de permission donné.
-     * Retourne {@code true} sans restriction si le nœud est null ou vide dans la config.
+    * Checks whether the sender has the given permission node.
+    * Returns {@code true} without restriction if the node is null or blank in the config.
      */
     public static boolean canUse(CommandSender sender, String permissionNode, JavaPlugin plugin) {
         if (permissionNode == null || permissionNode.isBlank()) return true;
@@ -18,9 +18,9 @@ public class DanseGuard {
     }
 
     /**
-     * Vérifie que le monde du joueur est autorisé selon la config.
-     * {@code allowedWorlds} (si non vide) : le monde doit y figurer.
-     * {@code deniedWorlds} : le monde ne doit pas y figurer.
+    * Checks whether the player's world is allowed according to the config.
+    * {@code allowedWorlds} (if not empty): the world must be listed there.
+    * {@code deniedWorlds}: the world must not be listed there.
      */
     public static boolean isWorldAllowed(Player player, JavaPlugin plugin) {
         List<String> allowed = plugin.getConfig().getStringList("worlds.allowedWorlds");

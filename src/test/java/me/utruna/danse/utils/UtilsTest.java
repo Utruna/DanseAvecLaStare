@@ -5,14 +5,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests unitaires pour Utils.colorize.
+ * Unit tests for Utils.colorize.
  *
- * Prérequis : net.md_5.bungee.api.ChatColor est disponible via paper-api (scope provided).
- * ChatColor.translateAlternateColorCodes et ChatColor.of sont de pures méthodes statiques
- * qui n'ont pas besoin d'un serveur en cours d'exécution.
+ * Prerequisite: net.md_5.bungee.api.ChatColor is available through paper-api (provided scope).
+ * ChatColor.translateAlternateColorCodes and ChatColor.of are pure static methods
+ * that do not require a running server.
  *
- * Si ChatColor n'est pas disponible sur le classpath de test (ex : environnement CI sans
- * paper-api), tous les tests de cette classe échoueront avec ClassNotFoundException.
+ * If ChatColor is not available on the test classpath (for example, a CI environment without
+ * paper-api), all tests in this class will fail with ClassNotFoundException.
  */
 class UtilsTest {
 
@@ -30,7 +30,7 @@ class UtilsTest {
 
     @Test
     void colorize_null_throwsNullPointerException() {
-        // Pattern.matcher(null) lève NPE — comportement documenté, non-modifiable sans breaking change.
+        // Pattern.matcher(null) throws NPE - documented behavior, not changeable without a breaking change.
         assertThrows(NullPointerException.class, () -> Utils.colorize(null));
     }
 
@@ -50,18 +50,18 @@ class UtilsTest {
 
     @Test
     void colorize_singleHexCode_replacedWithSectionSequence() {
-        // #FF0000 doit être remplacé par la séquence §x§... de ChatColor
+        // #FF0000 must be replaced by ChatColor's §x§... sequence
         String result = Utils.colorize("#FF0000Rouge");
-        assertFalse(result.contains("#FF0000"), "Le code hex brut ne doit plus apparaître");
-        assertTrue(result.contains(String.valueOf(SECTION)), "Le résultat doit contenir § (code couleur Minecraft)");
-        assertTrue(result.contains("Rouge"), "Le texte suivant doit être conservé");
+        assertFalse(result.contains("#FF0000"), "The raw hex code must no longer appear");
+        assertTrue(result.contains(String.valueOf(SECTION)), "The result must contain § (Minecraft color code)");
+        assertTrue(result.contains("Rouge"), "The following text must be preserved");
     }
 
     @Test
     void colorize_twoHexCodes_bothReplaced() {
         String result = Utils.colorize("#FF0000Rouge #00FF00Vert");
-        assertFalse(result.contains("#FF0000"), "Premier hex doit être remplacé");
-        assertFalse(result.contains("#00FF00"), "Second hex doit être remplacé");
+        assertFalse(result.contains("#FF0000"), "First hex must be replaced");
+        assertFalse(result.contains("#00FF00"), "Second hex must be replaced");
         assertTrue(result.contains(String.valueOf(SECTION)));
         assertTrue(result.contains("Rouge"));
         assertTrue(result.contains("Vert"));
@@ -69,16 +69,16 @@ class UtilsTest {
 
     @Test
     void colorize_invalidAmpersandSequence_leftUnchanged() {
-        // &# : '#' n'est pas un code couleur Minecraft valide → translateAlternateColorCodes ne le traduit pas
-        // Le pattern hex #[a-fA-F0-9]{6} ne matche pas "invalid"
+        // &#: '#' is not a valid Minecraft color code -> translateAlternateColorCodes does not translate it
+        // The hex pattern #[a-fA-F0-9]{6} does not match "invalid"
         assertEquals("&#invalid", Utils.colorize("&#invalid"));
     }
 
     @Test
     void colorize_hexAndAmpersandCode_bothConverted() {
-        // Les deux mécanismes (hex + &) doivent coexister
+        // Both mechanisms (hex + &) must coexist
         String result = Utils.colorize("#FF0000&aTexte");
-        assertFalse(result.contains("#FF0000"), "Code hex doit être remplacé");
-        assertTrue(result.contains(SECTION + "a"), "Code & doit être traduit en §a");
+        assertFalse(result.contains("#FF0000"), "Hex code must be replaced");
+        assertTrue(result.contains(SECTION + "a"), "& code must be translated to §a");
     }
 }

@@ -9,17 +9,12 @@ useModelEngine: true
 modelEngine:
   useFallbackMode: false
   fallbackModelId: joueur_fallback
-  renderRadius: 256
+  renderRadius: 128
 
 
 # Configuration des dances - Chaque style de danse est défini ici
 # Ajoute une nouvelle danse sans modifier le code Java, juste la config !
 dances:
-  twist:
-    displayName: "Twist"
-    modelId: danseur
-    animationName: dance
-    movementType: dynamic
 
   dj:
     displayName: "DJ"
@@ -59,7 +54,7 @@ preview:
 skinFetcher:
   # Nombre maximum de threads dédiés aux requêtes Mojang. Augmenter si plusieurs dizaines de skins
   # sont chargés simultanément au démarrage ; garder bas sur des serveurs peu chargés.
-  maxThreads: 4
+  maxThreads: 10
   # Délai maximal d'attente d'une réponse Mojang avant abandon (en secondes).
   # En cas de timeout, le skin est ignoré et la danse est annulée pour ce joueur.
   timeoutSeconds: 5

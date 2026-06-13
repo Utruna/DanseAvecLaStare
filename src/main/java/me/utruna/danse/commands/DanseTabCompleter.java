@@ -82,7 +82,7 @@ public class DanseTabCompleter implements TabCompleter {
         // /danse npc <subcommand>
         if (args.length == 2 && args[0].equalsIgnoreCase("npc")) {
             String partial = args[1].toLowerCase();
-            return List.of("spawn", "move", "delete", "list", "highlight", "resize", "style", "skin", "reloadskins").stream()
+            return List.of("spawn", "move", "delete", "list", "highlight", "resize", "style", "skin").stream()
                     .filter(s -> s.startsWith(partial)).collect(Collectors.toList());
         }
         // /danse npc <move|delete|highlight|resize|style|skin> <id>
@@ -93,12 +93,6 @@ public class DanseTabCompleter implements TabCompleter {
                 return staticDancerManager.getDancerIds().stream()
                         .filter(id -> id.toLowerCase().startsWith(partial))
                         .collect(Collectors.toList());
-            }
-            // /danse npc reloadskins <pseudo> → joueurs en ligne
-            if (sub.equals("reloadskins")) {
-                String partial = args[2].toLowerCase();
-                return Bukkit.getOnlinePlayers().stream().map(Player::getName)
-                        .filter(n -> n.toLowerCase().startsWith(partial)).collect(Collectors.toList());
             }
         }
         // /danse npc skin <id> <alias>

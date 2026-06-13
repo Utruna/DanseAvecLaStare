@@ -7,7 +7,7 @@ softdepend: [ModelEngine]
 commands:
   danse:
     description: Lance ou arrête une danse
-    usage: /danse [style|preview <style>|npc <spawn|move|delete|list|highlight|resize|style|skin|reloadskins>|skin <save|apply|list|remove>|choreo|playlist|list|stop|reload|debug]
+    usage: /danse [style|preview <style>|npc <spawn|move|delete|list|highlight|resize|style|skin>|skin <save|apply|list|remove>|choreo|playlist|list|stop|reload|debug]
 
 permissions:
   danse.player:

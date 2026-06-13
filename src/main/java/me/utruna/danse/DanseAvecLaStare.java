@@ -74,8 +74,9 @@ public class DanseAvecLaStare extends JavaPlugin {
             // +40 ticks supplémentaires pour laisser le temps aux fetchs de skin async avant de
             // charger les groupes de chorégraphie (qui nécessitent que les danseurs soient actifs).
             Bukkit.getScheduler().runTaskLater(this, () -> {
-                staticDancerManager.loadFromFile();
-                Bukkit.getScheduler().runTaskLater(this, staticDancerManager::loadChoreographyFromFile, 40L);
+                long loadDuration = staticDancerManager.loadFromFile();
+                // +20 ticks de marge après le dernier lot pour que les skins alias soient appliqués
+                Bukkit.getScheduler().runTaskLater(this, staticDancerManager::loadChoreographyFromFile, loadDuration + 20L);
             }, 60L);
         }
 
@@ -450,7 +451,7 @@ public class DanseAvecLaStare extends JavaPlugin {
     /** Gère les sous-commandes /danse npc. */
     private boolean handleNpcCommand(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage("§eUsage: §f/danse npc <spawn|move|delete|list [distance]|highlight|resize|style>");
+            sender.sendMessage("§eUsage: §f/danse npc <spawn|move|delete|list [distance]|highlight|resize|style|skin|reloadskins [pseudo]>");
             return true;
         }
         switch (args[1].toLowerCase()) {
@@ -624,7 +625,17 @@ public class DanseAvecLaStare extends JavaPlugin {
                         : "§cÉchec de l'application du skin.");
             }
 
-            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: spawn, move, delete, list [distance], highlight, resize, style, skin");
+            case "reloadskins" -> {
+                String playerFilter = args.length >= 3 ? args[2] : null;
+                int count = staticDancerManager.reloadSkins(playerFilter);
+                if (playerFilter != null) {
+                    sender.sendMessage("§aReload du skin de §f" + playerFilter + "§a lancé sur §f" + count + "§a NPC(s).");
+                } else {
+                    sender.sendMessage("§aReload de tous les skins lancé sur §f" + count + "§a NPC(s).");
+                }
+            }
+
+            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: spawn, move, delete, list [distance], highlight, resize, style, skin, reloadskins");
         }
         return true;
     }

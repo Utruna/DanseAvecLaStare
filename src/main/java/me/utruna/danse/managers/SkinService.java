@@ -1,5 +1,12 @@
 package me.utruna.danse.managers;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Marker;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.filter.AbstractFilter;
+import org.apache.logging.log4j.message.Message;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -48,6 +55,7 @@ public class SkinService {
     }
 
     private static volatile RemoteProfileLoader remoteProfileLoader = SkinService::loadRemoteProfile;
+    private static volatile boolean noiseFilterInstalled = false;
 
     private static ExecutorService buildExecutor(int threads) {
         return Executors.newFixedThreadPool(Math.max(1, threads), r -> {
@@ -63,9 +71,49 @@ public class SkinService {
      * L'ancien pool (s'il existe) est arrêté proprement avant remplacement.
      */
     public static void init(int maxThreads) {
+        suppressProfileLookupNoise();
         ExecutorService old = executor;
         executor = buildExecutor(maxThreads);
         if (old != null) old.shutdown();
+    }
+
+    /**
+     * Filtre le logger authlib pour supprimer le WARN verbeux "Couldn't look up profile
+     * properties for UUID" + stack trace que Paper logue à chaque réponse 429 de Mojang.
+     * Appelé une seule fois à l'init ; silencieux si Log4j2-core est absent.
+     */
+    private static void suppressProfileLookupNoise() {
+        if (noiseFilterInstalled) return;
+        noiseFilterInstalled = true;
+        try {
+            AbstractFilter filter = new AbstractFilter() {
+                private Result check(String msg) {
+                    return msg != null && msg.startsWith("Couldn't look up profile properties")
+                            ? Result.DENY : Result.NEUTRAL;
+                }
+                @Override public Result filter(LogEvent event) {
+                    return check(event.getMessage().getFormattedMessage());
+                }
+                @Override public Result filter(org.apache.logging.log4j.core.Logger logger,
+                                               Level level, Marker marker, String msg, Object... p) {
+                    return check(msg);
+                }
+                @Override public Result filter(org.apache.logging.log4j.core.Logger logger,
+                                               Level level, Marker marker, Message msg, Throwable t) {
+                    return check(msg.getFormattedMessage());
+                }
+                @Override public Result filter(org.apache.logging.log4j.core.Logger logger,
+                                               Level level, Marker marker, Object msg, Throwable t) {
+                    return check(String.valueOf(msg));
+                }
+            };
+            filter.start();
+            ((LoggerContext) LogManager.getContext(false))
+                    .getLogger("com.mojang.authlib.yggdrasil.YggdrasilMinecraftSessionService")
+                    .addFilter(filter);
+        } catch (Throwable ignored) {
+            // Log4j2-core absent, non initialisé (tests unitaires) ou version incompatible
+        }
     }
 
     /**

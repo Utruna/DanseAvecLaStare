@@ -28,6 +28,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.UUID;
@@ -433,7 +434,7 @@ public class DanseAvecLaStare extends JavaPlugin {
     /** Gère les sous-commandes /danse npc. */
     private boolean handleNpcCommand(CommandSender sender, String[] args) {
         if (args.length < 2) {
-            sender.sendMessage("§eUsage: §f/danse npc <spawn|move|delete|list|highlight|resize|style>");
+            sender.sendMessage("§eUsage: §f/danse npc <spawn|move|delete|list [distance]|highlight|resize|style>");
             return true;
         }
         switch (args[1].toLowerCase()) {
@@ -460,7 +461,10 @@ public class DanseAvecLaStare extends JavaPlugin {
                     }
                     player.sendMessage("§7Récupération du skin de §f" + skinTarget + "§7...");
                     SkinService.fetchSkin(this, skinTarget, (profile) -> {
-                        if (profile == null) { player.sendMessage("§cJoueur introuvable ou erreur Mojang : §f" + skinTarget); return; }
+                        if (profile == null) {
+                            player.sendMessage("§cSkin invalide : §f" + skinTarget + "§c. Le NPC n'a pas été créé.");
+                            return;
+                        }
                         Bukkit.getScheduler().runTask(this, () -> {
                             boolean spawned = staticDancerManager.spawnStaticDancer(id, loc, styleName, profile, skinTarget);
                             player.sendMessage(spawned
@@ -496,11 +500,40 @@ public class DanseAvecLaStare extends JavaPlugin {
             }
 
             case "list" -> {
-                Set<String> ids = staticDancerManager.getDancerIds();
-                if (ids.isEmpty()) {
-                    sender.sendMessage("§eAucun NPC actif.");
+                if (args.length >= 3) {
+                    if (!(sender instanceof Player player)) {
+                        sender.sendMessage("§cJoueur uniquement pour /danse npc list <distance>.");
+                        return true;
+                    }
+                    double radius;
+                    try {
+                        radius = Double.parseDouble(args[2]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage("§cDistance invalide: §f" + args[2]);
+                        return true;
+                    }
+                    if (radius <= 0) {
+                        player.sendMessage("§cLa distance doit être positive.");
+                        return true;
+                    }
+                    Map<String, Double> nearby = staticDancerManager.getDancersNear(player.getLocation(), radius);
+                    if (nearby.isEmpty()) {
+                        player.sendMessage("§eAucun NPC dans un rayon de §f" + radius + "§e blocs.");
+                    } else {
+                        player.sendMessage("§eNPCs dans un rayon de §f" + radius + "§e blocs §7(" + nearby.size() + ") :");
+                        nearby.forEach((id, dist) -> {
+                            String style = staticDancerManager.getDancerStyle(id);
+                            player.sendMessage("§f  " + id + " §7— §f" + String.format("%.1f", dist) + " §7blocs"
+                                    + (style != null ? " §7(§e" + style + "§7)" : ""));
+                        });
+                    }
                 } else {
-                    sender.sendMessage("§eNPCs actifs: §f" + String.join(", ", new java.util.TreeSet<>(ids)));
+                    Set<String> ids = staticDancerManager.getDancerIds();
+                    if (ids.isEmpty()) {
+                        sender.sendMessage("§eAucun NPC actif.");
+                    } else {
+                        sender.sendMessage("§eNPCs actifs: §f" + String.join(", ", new java.util.TreeSet<>(ids)));
+                    }
                 }
             }
 
@@ -552,7 +585,7 @@ public class DanseAvecLaStare extends JavaPlugin {
                         : "§cÉchec du changement de style pour '§f" + id + "§c'.");
             }
 
-            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: spawn, move, delete, list, highlight, resize, style");
+            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: spawn, move, delete, list [distance], highlight, resize, style");
         }
         return true;
     }

@@ -257,6 +257,23 @@ public class StaticDancerManager {
         return e == null || e.location == null ? null : e.location.clone();
     }
 
+    /**
+     * Returns dancers within {@code radius} blocks of {@code center}, sorted by ascending distance.
+     * The map keys are dancer IDs, values are distances in blocks.
+     */
+    public Map<String, Double> getDancersNear(Location center, double radius) {
+        double radiusSq = radius * radius;
+        Map<String, Double> result = new LinkedHashMap<>();
+        activeDancers.entrySet().stream()
+                .filter(e -> e.getValue().location != null
+                        && e.getValue().location.getWorld() != null
+                        && e.getValue().location.getWorld().equals(center.getWorld())
+                        && e.getValue().location.distanceSquared(center) <= radiusSq)
+                .sorted(Comparator.comparingDouble(e -> e.getValue().location.distanceSquared(center)))
+                .forEach(e -> result.put(e.getKey(), Math.sqrt(e.getValue().location.distanceSquared(center))));
+        return result;
+    }
+
     /** Returns the current scale of a static dancer, or 1.0 if not found. */
     public double getDancerScale(String id) {
         StaticDancerEntry e = activeDancers.get(id);
@@ -718,6 +735,12 @@ public class StaticDancerManager {
                 final double fScale = scale;
                 SkinService.fetchSkin(plugin, skin, profile ->
                         Bukkit.getScheduler().runTask(plugin, () -> {
+                            if (profile == null) {
+                                plugin.getLogger().warning("[StaticDancer] Skin invalide pour '" + fId
+                                        + "' (skin: '" + fSkin + "') — danseur supprimé du fichier.");
+                                removeDancerFromFile(fId);
+                                return;
+                            }
                             spawnStaticDancer(fId, loc, fStyle, profile, fSkin);
                             if (fScale != 1.0) setScale(fId, fScale);
                         })

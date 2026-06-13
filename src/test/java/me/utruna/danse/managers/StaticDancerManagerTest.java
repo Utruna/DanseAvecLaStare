@@ -17,6 +17,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -368,6 +369,103 @@ class StaticDancerManagerTest {
     void getDancerScale_returnsDefaultOne_whenDancerDoesNotExist() {
         assertEquals(1.0, manager.getDancerScale("inexistant"),
                 "Scale par défaut doit être 1.0 si le danseur n'existe pas");
+    }
+
+    // -------------------------------------------------------------------------
+    // getDancersNear
+    // -------------------------------------------------------------------------
+
+    @Test
+    void getDancersNear_returnsEmpty_whenNoDancers() {
+        World world = server.addSimpleWorld("world");
+        assertTrue(manager.getDancersNear(new Location(world, 0, 64, 0), 10).isEmpty(),
+                "Doit retourner une map vide s'il n'y a aucun danseur");
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void getDancersNear_returnsEmpty_whenAllBeyondRadius() throws Exception {
+        World world = server.addSimpleWorld("world");
+        injectDancer("far1", mock(PlayerProfile.class), "skin", new Location(world, 50, 64, 0));
+        injectDancer("far2", mock(PlayerProfile.class), "skin", new Location(world,  0, 64, 50));
+
+        assertTrue(manager.getDancersNear(new Location(world, 0, 64, 0), 10).isEmpty(),
+                "Doit retourner une map vide si tous les danseurs sont hors du rayon");
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void getDancersNear_returnsAllWithinRadius() throws Exception {
+        World world = server.addSimpleWorld("world");
+        injectDancer("a", mock(PlayerProfile.class), "skin", new Location(world, 3, 64, 0));
+        injectDancer("b", mock(PlayerProfile.class), "skin", new Location(world, 0, 64, 4));
+
+        Map<String, Double> result = manager.getDancersNear(new Location(world, 0, 64, 0), 10);
+        assertEquals(2, result.size());
+        assertTrue(result.containsKey("a"));
+        assertTrue(result.containsKey("b"));
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void getDancersNear_excludesDancersOutsideRadius() throws Exception {
+        World world = server.addSimpleWorld("world");
+        injectDancer("inside",  mock(PlayerProfile.class), "skin", new Location(world,  5, 64, 0));
+        injectDancer("outside", mock(PlayerProfile.class), "skin", new Location(world, 20, 64, 0));
+
+        Map<String, Double> result = manager.getDancersNear(new Location(world, 0, 64, 0), 10);
+        assertEquals(1, result.size());
+        assertTrue(result.containsKey("inside"));
+        assertFalse(result.containsKey("outside"));
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void getDancersNear_sortedByAscendingDistance() throws Exception {
+        World world = server.addSimpleWorld("world");
+        injectDancer("close", mock(PlayerProfile.class), "skin", new Location(world, 2, 64, 0));
+        injectDancer("far",   mock(PlayerProfile.class), "skin", new Location(world, 8, 64, 0));
+        injectDancer("mid",   mock(PlayerProfile.class), "skin", new Location(world, 5, 64, 0));
+
+        List<String> order = new ArrayList<>(manager.getDancersNear(new Location(world, 0, 64, 0), 15).keySet());
+        assertEquals(List.of("close", "mid", "far"), order,
+                "Les danseurs doivent être triés par distance croissante");
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void getDancersNear_distanceValueIsCorrect() throws Exception {
+        World world = server.addSimpleWorld("world");
+        // triangle 3-4-5 → distance exacte = 5.0
+        injectDancer("d", mock(PlayerProfile.class), "skin", new Location(world, 3, 64, 4));
+
+        Map<String, Double> result = manager.getDancersNear(new Location(world, 0, 64, 0), 10);
+        assertEquals(1, result.size());
+        assertEquals(5.0, result.get("d"), 1e-9,
+                "La distance doit être exactement 5.0 (triangle pythagoricien 3-4-5)");
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void getDancersNear_includedExactlyOnBoundary() throws Exception {
+        World world = server.addSimpleWorld("world");
+        injectDancer("boundary", mock(PlayerProfile.class), "skin", new Location(world, 10, 64, 0));
+
+        Map<String, Double> result = manager.getDancersNear(new Location(world, 0, 64, 0), 10);
+        assertTrue(result.containsKey("boundary"),
+                "Un danseur exactement sur la limite du rayon doit être inclus");
+        assertEquals(10.0, result.get("boundary"), 1e-9);
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void getDancersNear_excludesDancerInDifferentWorld() throws Exception {
+        World world1 = server.addSimpleWorld("world1");
+        World world2 = server.addSimpleWorld("world2");
+        injectDancer("other", mock(PlayerProfile.class), "skin", new Location(world2, 1, 64, 0));
+
+        assertTrue(manager.getDancersNear(new Location(world1, 0, 64, 0), 100).isEmpty(),
+                "Un danseur dans un monde différent ne doit pas être retourné");
     }
 
     // -------------------------------------------------------------------------

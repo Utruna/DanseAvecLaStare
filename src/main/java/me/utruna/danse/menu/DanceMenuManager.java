@@ -556,27 +556,59 @@ public class DanceMenuManager {
     // ── §1 Dancer list ────────────────────────────────────────────────────
 
     private void openStaffDancerList(Player viewer) {
-        Inventory inv = beginOpen(viewer, 54, "§bDanseurs statiques", "staff_dancer_list");
+        openStaffDancerList(viewer, 0);
+    }
+
+    private void openStaffDancerList(Player viewer, int page) {
+        final int ITEMS_PER_PAGE = 45;
         List<String> ids = new ArrayList<>(sdm.getDancerIds());
         Collections.sort(ids);
+
+        int totalPages = Math.max(1, (int) Math.ceil(ids.size() / (double) ITEMS_PER_PAGE));
+        int clampedPage = Math.max(0, Math.min(page, totalPages - 1));
+        int pageStart = clampedPage * ITEMS_PER_PAGE;
+
+        Inventory inv = beginOpen(viewer, 54,
+                "§bDanseurs §8(" + (clampedPage + 1) + "/" + totalPages + ")",
+                "staff_dancer_list");
+
         if (ids.isEmpty()) {
             register(inv, 0, makeIcon(Material.BARRIER, "§cAucun danseur actif", List.of()), null);
         } else {
-            int show = Math.min(ids.size(), 52);
-            for (int i = 0; i < show; i++) {
+            int end = Math.min(pageStart + ITEMS_PER_PAGE, ids.size());
+            for (int i = pageStart; i < end; i++) {
                 final String id = ids.get(i);
                 DancerSnapshot snap = snapshotDancer(id);
-                register(inv, i,
+                register(inv, i - pageStart,
                     makeHeadFromProfile(snap.skinProfile(), "§f" + id,
                         List.of("§7style: §f" + snap.styleName(),
                             "§7skin: §f" + snap.skinName())),
                     (player, click) -> openStaffDancer(player, id));
             }
-            if (ids.size() > 52)
-                register(inv, 51, makeIcon(Material.GRAY_STAINED_GLASS_PANE,
-                        "§8... et " + (ids.size() - 51) + " de plus", List.of()), null);
         }
+
+        if (clampedPage > 0) {
+            register(inv, 47,
+                makeIcon(Material.ARROW, "§6← Page précédente",
+                    List.of("§7Page " + clampedPage + " / " + totalPages)),
+                (player, click) -> openStaffDancerList(player, clampedPage - 1));
+        }
+
+        register(inv, 49,
+            makeIcon(Material.PAPER,
+                "§fPage §e" + (clampedPage + 1) + " §f/ §e" + totalPages,
+                List.of("§7" + ids.size() + " danseur(s) au total")),
+            null);
+
+        if (clampedPage < totalPages - 1) {
+            register(inv, 51,
+                makeIcon(Material.ARROW, "§6Page suivante →",
+                    List.of("§7Page " + (clampedPage + 2) + " / " + totalPages)),
+                (player, click) -> openStaffDancerList(player, clampedPage + 1));
+        }
+
         register(inv, 53, makeBack(), (player, click) -> openStaffMain(player));
+
         fill(inv);
         viewer.openInventory(inv);
     }
@@ -804,26 +836,8 @@ public class DanceMenuManager {
                             "§8... et " + (online.size() - 24) + " de plus", List.of()), null);
             }
             case "dancer" -> {
-                List<String> ids = new ArrayList<>(sdm.getDancerIds());
-                Collections.sort(ids);
-                if (ids.isEmpty()) break;
-                anyItem = true;
-                int show = Math.min(ids.size(), 25);
-                for (int i = 0; i < show; i++) {
-                    final String did = ids.get(i);
-                    String pl = pm.getActivePlaylistForDancer(did);
-                    register(inv, i,
-                            makeIcon(Material.PLAYER_HEAD, "§f" + did,
-                                    List.of(pl != null ? "§a▶ " + pl : "§7sans playlist")),
-                            (player, click) -> {
-                                pm.playForDancer(did, playlistId);
-                                player.sendMessage("§aPlaylist lancée sur §f" + did + "§a.");
-                                player.closeInventory();
-                            });
-                }
-                if (ids.size() > 25)
-                    register(inv, 24, makeIcon(Material.GRAY_STAINED_GLASS_PANE,
-                            "§8... et " + (ids.size() - 24) + " de plus", List.of()), null);
+                openTargetPickerDancer(viewer, playlistId, 0);
+                return;
             }
             case "group" -> {
                 List<String> ids = new ArrayList<>(sdm.getChoreographyGroupIds());
@@ -946,38 +960,122 @@ public class DanceMenuManager {
     // ── §8a Choreo member picker (add dancer to existing group) ──────────
 
     private void openStaffChoreoMemberPicker(Player viewer, String groupId) {
-        Inventory inv = beginOpen(viewer, 54,
-                "§5Ajouter membre → " + groupId,
-                "choreo_member_picker:" + groupId);
+        openStaffChoreoMemberPicker(viewer, groupId, 0);
+    }
 
+    private void openStaffChoreoMemberPicker(Player viewer, String groupId, int page) {
+        final int ITEMS_PER_PAGE = 45;
         Set<String> members = sdm.getChoreographyGroups().getOrDefault(groupId, Set.of());
         List<String> candidates = new ArrayList<>(sdm.getDancerIds());
         candidates.removeAll(members);
         Collections.sort(candidates);
 
+        int totalPages = Math.max(1, (int) Math.ceil(candidates.size() / (double) ITEMS_PER_PAGE));
+        int clampedPage = Math.max(0, Math.min(page, totalPages - 1));
+        int pageStart = clampedPage * ITEMS_PER_PAGE;
+
+        Inventory inv = beginOpen(viewer, 54,
+                "§5Ajouter membre §8(" + (clampedPage + 1) + "/" + totalPages + ")",
+                "choreo_member_picker:" + groupId);
+
         if (candidates.isEmpty()) {
             register(inv, 0,
                     makeIcon(Material.BARRIER, "§cTous les danseurs sont déjà membres", List.of()), null);
         } else {
-            int show = Math.min(candidates.size(), 52);
-            for (int i = 0; i < show; i++) {
+            int end = Math.min(pageStart + ITEMS_PER_PAGE, candidates.size());
+            for (int i = pageStart; i < end; i++) {
                 final String did = candidates.get(i);
                 DancerSnapshot snap = snapshotDancer(did);
-                register(inv, i,
+                register(inv, i - pageStart,
                     makeHeadFromProfile(snap.skinProfile(), "§f" + did,
                                 List.of("§7style: §f" + snap.styleName(),
                                         "§aclic → ajouter au groupe")),
                         (player, click) -> {
                             sdm.addToChoreography(groupId, did);
                             player.sendMessage("§a" + did + " §aajouté au groupe §f" + groupId + "§a.");
-                            openStaffChoreoMemberPicker(player, groupId);
+                            openStaffChoreoMemberPicker(player, groupId, clampedPage);
                         });
             }
-            if (candidates.size() > 52)
-                register(inv, 51, makeIcon(Material.GRAY_STAINED_GLASS_PANE,
-                        "§8... et " + (candidates.size() - 51) + " de plus", List.of()), null);
         }
+
+        if (clampedPage > 0) {
+            register(inv, 47,
+                makeIcon(Material.ARROW, "§6← Page précédente",
+                    List.of("§7Page " + clampedPage + " / " + totalPages)),
+                (player, click) -> openStaffChoreoMemberPicker(player, groupId, clampedPage - 1));
+        }
+
+        register(inv, 49,
+            makeIcon(Material.PAPER,
+                "§fPage §e" + (clampedPage + 1) + " §f/ §e" + totalPages,
+                List.of("§7" + candidates.size() + " candidat(s)")),
+            null);
+
+        if (clampedPage < totalPages - 1) {
+            register(inv, 51,
+                makeIcon(Material.ARROW, "§6Page suivante →",
+                    List.of("§7Page " + (clampedPage + 2) + " / " + totalPages)),
+                (player, click) -> openStaffChoreoMemberPicker(player, groupId, clampedPage + 1));
+        }
+
         register(inv, 53, makeBack(), (player, click) -> openStaffChoreoGroup(player, groupId));
+        fill(inv);
+        viewer.openInventory(inv);
+    }
+
+    private void openTargetPickerDancer(Player viewer, String playlistId, int page) {
+        final int ITEMS_PER_PAGE = 45;
+        List<String> ids = new ArrayList<>(sdm.getDancerIds());
+        Collections.sort(ids);
+
+        int totalPages = Math.max(1, (int) Math.ceil(ids.size() / (double) ITEMS_PER_PAGE));
+        int clampedPage = Math.max(0, Math.min(page, totalPages - 1));
+        int pageStart = clampedPage * ITEMS_PER_PAGE;
+
+        Inventory inv = beginOpen(viewer, 54,
+                "§6Cible danseur §8(" + (clampedPage + 1) + "/" + totalPages + ")",
+                "target_picker:dancer:" + playlistId);
+
+        if (ids.isEmpty()) {
+            register(inv, 0, makeIcon(Material.BARRIER, "§cAucune cible disponible", List.of()), null);
+        } else {
+            int end = Math.min(pageStart + ITEMS_PER_PAGE, ids.size());
+            for (int i = pageStart; i < end; i++) {
+                final String did = ids.get(i);
+                DancerSnapshot snap = snapshotDancer(did);
+                String pl = pm.getActivePlaylistForDancer(did);
+                register(inv, i - pageStart,
+                    makeHeadFromProfile(snap.skinProfile(), "§f" + did,
+                        List.of(pl != null ? "§a▶ " + pl : "§7sans playlist")),
+                    (player, click) -> {
+                        pm.playForDancer(did, playlistId);
+                        player.sendMessage("§aPlaylist lancée sur §f" + did + "§a.");
+                        player.closeInventory();
+                    });
+            }
+        }
+
+        if (clampedPage > 0) {
+            register(inv, 47,
+                makeIcon(Material.ARROW, "§6← Page précédente",
+                    List.of("§7Page " + clampedPage + " / " + totalPages)),
+                (player, click) -> openTargetPickerDancer(player, playlistId, clampedPage - 1));
+        }
+
+        register(inv, 49,
+            makeIcon(Material.PAPER,
+                "§fPage §e" + (clampedPage + 1) + " §f/ §e" + totalPages,
+                List.of("§7" + ids.size() + " danseur(s) au total")),
+            null);
+
+        if (clampedPage < totalPages - 1) {
+            register(inv, 51,
+                makeIcon(Material.ARROW, "§6Page suivante →",
+                    List.of("§7Page " + (clampedPage + 2) + " / " + totalPages)),
+                (player, click) -> openTargetPickerDancer(player, playlistId, clampedPage + 1));
+        }
+
+        register(inv, 53, makeBack(), (player, click) -> openStaffPlaylist(player, playlistId));
         fill(inv);
         viewer.openInventory(inv);
     }
@@ -1274,7 +1372,7 @@ public class DanceMenuManager {
                         Player p = Bukkit.getPlayer(viewerId);
                         if (p == null) return;
                         if (profile == null) {
-                            p.sendMessage("§cSkin introuvable pour §f" + skinName + "§c.");
+                            p.sendMessage("§cSkin invalide : §f" + skinName + "§c.");
                         } else {
                             boolean ok = sdm.changeSkin(dancerId, profile, skinName);
                             p.sendMessage(ok ? "§aSkin changé en §f" + skinName + "§a."

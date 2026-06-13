@@ -469,6 +469,78 @@ class StaticDancerManagerTest {
     }
 
     // -------------------------------------------------------------------------
+    // changeDancerSkin — avec alias cache
+    // -------------------------------------------------------------------------
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void changeDancerSkin_returnsFalse_whenDancerDoesNotExist() {
+        PlayerProfile profile = mock(PlayerProfile.class);
+        assertFalse(manager.changeDancerSkin("inexistant", profile, null, "alias1"));
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void changeDancerSkin_returnsFalse_whenProfileIsNull() throws Exception {
+        World world = server.addSimpleWorld("worldDCS");
+        injectDancer("d_dcs_null", mock(PlayerProfile.class), "old", new Location(world, 0, 64, 0));
+        assertFalse(manager.changeDancerSkin("d_dcs_null", null, null, "alias1"),
+                "changeDancerSkin doit retourner false si le profil est null");
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void changeDancerSkin_updatesProfileAliasAndPersists() throws Exception {
+        World world = server.addSimpleWorld("worldDCS2");
+        Location loc = new Location(world, 5, 64, 5, 0f, 0f);
+        PlayerProfile oldProfile = mock(PlayerProfile.class);
+        PlayerProfile newProfile = mock(PlayerProfile.class);
+        injectDancer("d_dcs", oldProfile, "oldSkin", loc);
+
+        boolean ok = manager.changeDancerSkin("d_dcs", newProfile, null, "my_alias");
+
+        assertTrue(ok);
+        assertSame(newProfile, manager.getDancerProfile("d_dcs"), "Profil doit être mis à jour");
+        assertEquals("my_alias", manager.getDancerSkinAlias("d_dcs"), "Alias doit être enregistré");
+        assertNull(manager.getDancerSkin("d_dcs"), "skinName doit être null quand alias est utilisé");
+
+        // Persistance YAML
+        File savedFile = new File(tempDir.toFile(), "static_dancers.yml");
+        assertTrue(savedFile.exists());
+        YamlConfiguration saved = YamlConfiguration.loadConfiguration(savedFile);
+        assertEquals("my_alias", saved.getString("dancers.d_dcs.skin_alias"),
+                "skin_alias doit être écrit dans le YAML");
+        assertNull(saved.getString("dancers.d_dcs.skin"),
+                "skin (nom joueur) doit être null quand alias est actif");
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void changeSkin_clearsAlias() throws Exception {
+        World world = server.addSimpleWorld("worldClearAlias");
+        Location loc = new Location(world, 0, 64, 0);
+        injectDancer("d_clear", mock(PlayerProfile.class), "oldSkin", loc);
+        // Pose d'abord un alias
+        manager.changeDancerSkin("d_clear", mock(PlayerProfile.class), null, "alias_x");
+        assertEquals("alias_x", manager.getDancerSkinAlias("d_clear"));
+
+        // changeSkin (sans alias) doit effacer l'alias
+        manager.changeSkin("d_clear", mock(PlayerProfile.class), "newPlayerName");
+        assertNull(manager.getDancerSkinAlias("d_clear"), "changeSkin doit effacer skinAlias");
+        assertEquals("newPlayerName", manager.getDancerSkin("d_clear"));
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    void getDancerSkinAlias_returnsNull_whenNoDancerOrNoAlias() throws Exception {
+        World world = server.addSimpleWorld("worldAlias");
+        injectDancer("d_noalias", mock(PlayerProfile.class), "skin", new Location(world, 0, 64, 0));
+
+        assertNull(manager.getDancerSkinAlias("inexistant"), "Doit retourner null pour danseur inconnu");
+        assertNull(manager.getDancerSkinAlias("d_noalias"), "Doit retourner null si aucun alias défini");
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers — injection d'une StaticDancerEntry via reflection
     // -------------------------------------------------------------------------
 

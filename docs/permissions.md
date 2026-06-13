@@ -53,7 +53,8 @@ dances:
 - `/danse <style>` : `danse.style.<style>` (si défini) ou `danse.player` sinon
 - `/danse <style> <pseudo>` : `danse.skin` + permission du style
 - `/danse list` / `/danse stop` : `danse.player`
-- `/danse here|move|delete|listID|highlight` : `danse.static`
+- `/danse npc <spawn|move|delete|list|highlight|resize|style|skin>` : `danse.static`
+- `/danse skin <save|apply|list|remove>` : `danse.static`
 - `/danse choreo ...` : `danse.choreo`
 - `/danse playlist ...` : `danse.playlist` (sauf `play` public = `danse.playlist.play`)
 - Menu staff / réglages d'affichage : `danse.staff`

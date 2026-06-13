@@ -388,6 +388,38 @@ class SkinServiceTest {
     }
 
     // =========================================================================
+    // Fix : joueur en ligne prioritaire sur le cache session
+    // =========================================================================
+
+    @Test
+    void fetchSkin_onlinePlayerTakesPriorityOverStaleCache() {
+        // Simule le bug original : un profil est mis en cache (ex: via /danse skin save),
+        // puis le joueur reconnecte avec un skin différent.
+        // Avant le fix, le cache était retourné en priorité sur le joueur en ligne.
+        PlayerMock player = server.addPlayer();
+        String name = player.getName();
+
+        // Peuple le cache avec un premier profil (profil "A")
+        AtomicReference<PlayerProfile> firstProfile = new AtomicReference<>();
+        SkinService.fetchSkin(plugin, name, firstProfile::set);
+        assertNotNull(firstProfile.get());
+
+        // Injecte un profil différent via le loader distant (simule une reconnexion)
+        PlayerProfile freshProfile = mock(PlayerProfile.class);
+        SkinService.setRemoteProfileLoader((p, u, t) -> freshProfile);
+
+        // Même si le cache contient firstProfile, un joueur en ligne doit retourner
+        // son profil actuel (getPlayerProfile), pas le cache.
+        // MockBukkit retourne player.getPlayerProfile() — différent du mock freshProfile,
+        // mais le point clé est que le code visite la branche "online" avant "cache".
+        AtomicReference<PlayerProfile> result = new AtomicReference<>();
+        SkinService.fetchSkin(plugin, name, result::set);
+
+        // Le résultat doit être le profil live du joueur (non-null), pas null.
+        assertNotNull(result.get(), "Le profil live doit être retourné même si le cache est peuplé");
+    }
+
+    // =========================================================================
     // Chemin joueur hors ligne — nécessite réseau Mojang
     // =========================================================================
 

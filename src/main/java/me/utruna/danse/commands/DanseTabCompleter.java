@@ -2,6 +2,7 @@ package me.utruna.danse.commands;
 
 import me.utruna.danse.managers.DanceManager;
 import me.utruna.danse.managers.PlaylistManager;
+import me.utruna.danse.managers.SkinCacheManager;
 import me.utruna.danse.managers.StaticDancerManager;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -18,11 +19,14 @@ public class DanseTabCompleter implements TabCompleter {
     private final DanceManager danceManager;
     private final StaticDancerManager staticDancerManager;
     private final PlaylistManager playlistManager;
+    private final SkinCacheManager skinCacheManager;
 
-    public DanseTabCompleter(DanceManager danceManager, StaticDancerManager staticDancerManager, PlaylistManager playlistManager) {
+    public DanseTabCompleter(DanceManager danceManager, StaticDancerManager staticDancerManager,
+                             PlaylistManager playlistManager, SkinCacheManager skinCacheManager) {
         this.danceManager = danceManager;
         this.staticDancerManager = staticDancerManager;
         this.playlistManager = playlistManager;
+        this.skinCacheManager = skinCacheManager;
     }
 
     @Override
@@ -31,6 +35,7 @@ public class DanseTabCompleter implements TabCompleter {
             String partial = args[0].toLowerCase();
             List<String> base = new ArrayList<>(danceManager.getStyleNames());
             base.add("npc");
+            base.add("skin");
             base.add("list");
             base.add("stop");
             base.add("choreo");
@@ -50,21 +55,51 @@ public class DanseTabCompleter implements TabCompleter {
                     .filter(s -> s.toLowerCase().startsWith(partial))
                     .collect(Collectors.toList());
         }
+        // /danse skin <subcommand>
+        if (args.length == 2 && args[0].equalsIgnoreCase("skin")) {
+            String partial = args[1].toLowerCase();
+            return List.of("save", "apply", "list", "remove").stream()
+                    .filter(s -> s.startsWith(partial)).collect(Collectors.toList());
+        }
+        // /danse skin save <alias> <pseudo>  →  arg 3 = alias (libre), arg 4 = joueur en ligne
+        if (args.length == 4 && args[0].equalsIgnoreCase("skin") && args[1].equalsIgnoreCase("save")) {
+            String partial = args[3].toLowerCase();
+            return Bukkit.getOnlinePlayers().stream().map(Player::getName)
+                    .filter(n -> n.toLowerCase().startsWith(partial)).collect(Collectors.toList());
+        }
+        // /danse skin apply <alias> <npcId>
+        if (args.length == 3 && args[0].equalsIgnoreCase("skin")
+                && (args[1].equalsIgnoreCase("apply") || args[1].equalsIgnoreCase("remove"))) {
+            String partial = args[2].toLowerCase();
+            return skinCacheManager == null ? List.of() : skinCacheManager.getAliases().stream()
+                    .filter(a -> a.startsWith(partial)).collect(Collectors.toList());
+        }
+        if (args.length == 4 && args[0].equalsIgnoreCase("skin") && args[1].equalsIgnoreCase("apply")) {
+            String partial = args[3].toLowerCase();
+            return staticDancerManager.getDancerIds().stream()
+                    .filter(id -> id.toLowerCase().startsWith(partial)).collect(Collectors.toList());
+        }
         // /danse npc <subcommand>
         if (args.length == 2 && args[0].equalsIgnoreCase("npc")) {
             String partial = args[1].toLowerCase();
-            return List.of("spawn", "move", "delete", "list", "highlight", "resize", "style").stream()
+            return List.of("spawn", "move", "delete", "list", "highlight", "resize", "style", "skin").stream()
                     .filter(s -> s.startsWith(partial)).collect(Collectors.toList());
         }
-        // /danse npc <move|delete|highlight|resize|style> <id>
+        // /danse npc <move|delete|highlight|resize|style|skin> <id>
         if (args.length == 3 && args[0].equalsIgnoreCase("npc")) {
             String sub = args[1].toLowerCase();
-            if (List.of("move", "delete", "highlight", "resize", "style").contains(sub)) {
+            if (List.of("move", "delete", "highlight", "resize", "style", "skin").contains(sub)) {
                 String partial = args[2].toLowerCase();
                 return staticDancerManager.getDancerIds().stream()
                         .filter(id -> id.toLowerCase().startsWith(partial))
                         .collect(Collectors.toList());
             }
+        }
+        // /danse npc skin <id> <alias>
+        if (args.length == 4 && args[0].equalsIgnoreCase("npc") && args[1].equalsIgnoreCase("skin")) {
+            String partial = args[3].toLowerCase();
+            return skinCacheManager == null ? List.of() : skinCacheManager.getAliases().stream()
+                    .filter(a -> a.startsWith(partial)).collect(Collectors.toList());
         }
         // /danse npc spawn <id> <style>   et   /danse npc style <id> <style>
         if (args.length == 4 && args[0].equalsIgnoreCase("npc")

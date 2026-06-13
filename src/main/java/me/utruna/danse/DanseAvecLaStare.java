@@ -7,6 +7,7 @@ import me.utruna.danse.listeners.PlayerListener;
 import me.utruna.danse.managers.DanceManager;
 import me.utruna.danse.managers.DanceStyle;
 import me.utruna.danse.managers.PlaylistManager;
+import me.utruna.danse.managers.SkinCacheManager;
 import me.utruna.danse.managers.SkinService;
 import me.utruna.danse.managers.StaticDancerManager;
 import me.utruna.danse.menu.DanceMenuManager;
@@ -42,6 +43,7 @@ public class DanseAvecLaStare extends JavaPlugin {
 
     private DanceManager danceManager;
     private StaticDancerManager staticDancerManager;
+    private SkinCacheManager skinCacheManager;
     private PlaylistManager playlistManager;
     private DanceMenuManager menuManager;
     private PlaylistCommandHandler playlistCommandHandler;
@@ -56,7 +58,9 @@ public class DanseAvecLaStare extends JavaPlugin {
         SkinService.init(getConfig().getInt("skinFetcher.maxThreads", 4));
 
         danceManager = new DanceManager(this);
+        skinCacheManager = new SkinCacheManager(this);
         staticDancerManager = new StaticDancerManager(this);
+        staticDancerManager.setSkinCacheManager(skinCacheManager);
         playlistManager = new PlaylistManager(this, danceManager, staticDancerManager);
         staticDancerManager.setPlaylistManager(playlistManager);
         playlistManager.loadFromFile();
@@ -83,7 +87,7 @@ public class DanseAvecLaStare extends JavaPlugin {
 
         if (getCommand("danse") != null) {
             getCommand("danse").setExecutor(this);
-            getCommand("danse").setTabCompleter(new DanseTabCompleter(danceManager, staticDancerManager, playlistManager));
+            getCommand("danse").setTabCompleter(new DanseTabCompleter(danceManager, staticDancerManager, playlistManager, skinCacheManager));
         }
         getLogger().info("Le plugin de danse est prêt !");
     }
@@ -145,6 +149,8 @@ public class DanseAvecLaStare extends JavaPlugin {
             getLogger().log(Level.WARNING, "Erreur lors de la mise à jour du config.yml", ex);
         }
     }
+
+    public SkinCacheManager getSkinCacheManager() { return skinCacheManager; }
 
     @Override
     public void onDisable() {
@@ -232,6 +238,16 @@ public class DanseAvecLaStare extends JavaPlugin {
                 sender.sendMessage("§cErreur lors du rechargement de la configuration.");
             }
             return true;
+        }
+
+        // --- Skin cache ---
+
+        if (args.length > 0 && args[0].equalsIgnoreCase("skin")) {
+            if (sender instanceof Player p && !p.hasPermission("danse.static")) {
+                sender.sendMessage("§cVous n'avez pas la permission danse.static.");
+                return true;
+            }
+            return handleSkinCacheCommand(sender, args);
         }
 
         // --- NPC : gestion des danseurs statiques ---
@@ -585,7 +601,104 @@ public class DanseAvecLaStare extends JavaPlugin {
                         : "§cÉchec du changement de style pour '§f" + id + "§c'.");
             }
 
-            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: spawn, move, delete, list [distance], highlight, resize, style");
+            case "skin" -> {
+                if (args.length < 4) {
+                    sender.sendMessage("§cUsage: §f/danse npc skin <id> <alias>");
+                    return true;
+                }
+                String id = args[2];
+                String alias = args[3];
+                if (!staticDancerManager.getDancerIds().contains(id)) {
+                    sender.sendMessage("§cAucun NPC avec l'ID: §f" + id);
+                    return true;
+                }
+                @SuppressWarnings("deprecation")
+                PlayerProfile cached = skinCacheManager.getSkin(alias);
+                if (cached == null) {
+                    sender.sendMessage("§cAlias '§f" + alias + "§c' introuvable dans le cache. Utilisez §f/danse skin list§c.");
+                    return true;
+                }
+                boolean ok = staticDancerManager.changeDancerSkin(id, cached, null, alias);
+                sender.sendMessage(ok
+                        ? "§aSkin '§f" + alias + "§a' appliqué au NPC '§f" + id + "§a'."
+                        : "§cÉchec de l'application du skin.");
+            }
+
+            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: spawn, move, delete, list [distance], highlight, resize, style, skin");
+        }
+        return true;
+    }
+
+    /** Gère les sous-commandes /danse skin. */
+    @SuppressWarnings("deprecation")
+    private boolean handleSkinCacheCommand(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§eUsage: §f/danse skin <save|apply|list|remove>");
+            return true;
+        }
+        switch (args[1].toLowerCase()) {
+
+            case "save" -> {
+                if (args.length < 4) {
+                    sender.sendMessage("§cUsage: §f/danse skin save <alias> <pseudo>");
+                    return true;
+                }
+                String alias = args[2].toLowerCase();
+                String playerName = args[3];
+                sender.sendMessage("§7Récupération du skin de §f" + playerName + "§7...");
+                SkinService.fetchSkin(this, playerName, profile -> {
+                    if (profile == null) {
+                        sender.sendMessage("§cSkin invalide ou introuvable: §f" + playerName);
+                        return;
+                    }
+                    skinCacheManager.saveSkin(alias, profile);
+                    sender.sendMessage("§aSkin de §f" + playerName + "§a sauvegardé sous l'alias '§f" + alias + "§a'.");
+                });
+            }
+
+            case "apply" -> {
+                if (args.length < 4) {
+                    sender.sendMessage("§cUsage: §f/danse skin apply <alias> <npcId>");
+                    return true;
+                }
+                String alias = args[2];
+                String npcId = args[3];
+                if (!staticDancerManager.getDancerIds().contains(npcId)) {
+                    sender.sendMessage("§cAucun NPC avec l'ID: §f" + npcId);
+                    return true;
+                }
+                PlayerProfile cached = skinCacheManager.getSkin(alias);
+                if (cached == null) {
+                    sender.sendMessage("§cAlias '§f" + alias + "§c' introuvable. Utilisez §f/danse skin list§c.");
+                    return true;
+                }
+                boolean ok = staticDancerManager.changeDancerSkin(npcId, cached, null, alias);
+                sender.sendMessage(ok
+                        ? "§aSkin '§f" + alias + "§a' appliqué au NPC '§f" + npcId + "§a'."
+                        : "§cÉchec de l'application du skin.");
+            }
+
+            case "list" -> {
+                java.util.Set<String> aliases = skinCacheManager.getAliases();
+                if (aliases.isEmpty()) {
+                    sender.sendMessage("§eAucun skin en cache.");
+                } else {
+                    sender.sendMessage("§eSkins en cache §7(" + aliases.size() + ") : §f" + String.join("§7, §f", aliases));
+                }
+            }
+
+            case "remove" -> {
+                if (args.length < 3) {
+                    sender.sendMessage("§cUsage: §f/danse skin remove <alias>");
+                    return true;
+                }
+                String alias = args[2];
+                sender.sendMessage(skinCacheManager.removeSkin(alias)
+                        ? "§aSkin '§f" + alias + "§a' supprimé du cache."
+                        : "§cAlias '§f" + alias + "§c' introuvable dans le cache.");
+            }
+
+            default -> sender.sendMessage("§cSous-commande inconnue. Utilisez: save, apply, list, remove");
         }
         return true;
     }

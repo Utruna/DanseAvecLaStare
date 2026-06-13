@@ -149,19 +149,20 @@ public class SkinService {
     public static void fetchSkin(Plugin plugin, String username, Consumer<PlayerProfile> callback) {
         String key = username.toLowerCase(Locale.ROOT);
 
-        // Cache : profil déjà résolu
-        PlayerProfile cached = CACHE.get(key);
-        if (cached != null) {
-            callback.accept(cached);
-            return;
-        }
-
-        // Joueur en ligne : profil disponible immédiatement
+        // Joueur en ligne : profil frais en priorité (avant le cache — évite de retourner
+        // un profil périmé si le joueur a changé de skin et s'est reconnecté depuis).
         Player online = Bukkit.getPlayerExact(username);
         if (online != null) {
             PlayerProfile profile = online.getPlayerProfile();
             CACHE.put(key, profile);
             callback.accept(profile);
+            return;
+        }
+
+        // Cache : profil déjà résolu (joueur hors ligne uniquement)
+        PlayerProfile cached = CACHE.get(key);
+        if (cached != null) {
+            callback.accept(cached);
             return;
         }
 

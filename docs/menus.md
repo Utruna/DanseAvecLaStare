@@ -15,11 +15,13 @@ Cette page documente les menus d'inventaire fournis par le plugin et l'API minim
 - Player Main (`openPlayerMain`) — permet de danser, arrêter, voir la playlist active, accéder au menu staff si permission `danse.staff`.
 - Player Styles (`openPlayerStyles`) — liste des styles disponibles pour le joueur (clic gauche = lancer, clic droit = chat pour pseudo skin).
 
-- Staff Main (`openStaffMain`) — central pour le staff: accès aux danseurs statiques, chorégraphies, playlists, joueurs en ligne, paramètres d'affichage, créer danseur.
-- Staff Dancer (`openStaffDancer`) — gestion d'un danseur statique : changer style, déplacer, assigner playlist/groupe, changer skin, renommer, supprimer.
+- Staff Main (`openStaffMain`) — central pour le staff: accès aux danseurs statiques, chorégraphies, playlists, joueurs en ligne, paramètres d'affichage, créer danseur, et cache de skins (slot 3 « Skins en cache »).
+- Staff Dancer (`openStaffDancer`) — gestion d'un danseur statique : changer style, déplacer, assigner playlist/groupe, changer skin, renommer, supprimer. Slot 15 « Skin depuis cache » (visible uniquement si le cache contient au moins un alias) ouvre `openSkinCachePicker` et affiche l'alias courant s'il en a un.
 - Staff Playlist (`openStaffPlaylist`) — éditeur d'une playlist : voir pistes, retirer piste (clic), lancer sur cible, ajouter piste.
 - Staff Playlist List (`openStaffPlaylistList`) — liste des playlists, création d'une nouvelle playlist (one-shot chat).
 - Staff Choreo (list / group) — gestion des groupes de chorégraphie, création, ajout/suppression, sync.
+- Staff Skin Cache (`openStaffSkinCache`) — liste paginée des alias enregistrés dans `skin_cache.yml`. Clic gauche sur un alias = choisir un NPC cible (`openSkinCachePicker`). Shift+clic = supprimer l'alias. Slot 45 « + » = créer un nouvel alias via prompt chat (`OneShotSkinSaver`).
+- Skin Cache Picker (`openSkinCachePicker`) — deux variantes : choisir un alias pour un NPC donné, ou choisir un NPC pour un alias donné. Accessible depuis `openStaffDancer` (slot 15 « Skin depuis cache ») ou depuis `openStaffSkinCache`.
 - Pickers (playlist picker, target picker, group picker, player picker) — sous-menus pour sélectionner cibles ou objets.
 - Choreo config / Playlist track config — écrans de configuration de répétitions avec boutons +/- et confirmation.
 
@@ -57,6 +59,9 @@ Cette page documente les menus d'inventaire fournis par le plugin et l'API minim
   - `openTargetPicker(Player viewer, String playlistId, String targetType)`
   - `openStaffPlayer(Player viewer, Player target)`
   - `openPlayerStylePicker(Player viewer, Player target)`
+  - `openStaffSkinCache(Player viewer, int page)` — liste paginée du cache de skins
+  - `openSkinCachePicker(Player viewer, String dancerId)` — choisir un alias pour un NPC
+  - `openSkinCachePicker(Player viewer, String dancerIdOrNull, String fixedAlias)` — choisir un NPC pour un alias fixé
 
   Remarques d'implémentation :
   - `beginOpen(...)` initialise l'état par-joueur et pousse une clef de nav (`navStack`).
@@ -65,7 +70,7 @@ Cette page documente les menus d'inventaire fournis par le plugin et l'API minim
 
 - `MenuListener` : écoute `InventoryClickEvent` et `InventoryCloseEvent` et délègue aux `DanceMenu`.
 
-- `MenuType` : énumère quelques types logiques utilisés par l'UI : `PLAYER_MAIN`, `PLAYER_STYLES`, `STAFF_MAIN`, `STAFF_DANCER`, `STAFF_PLAYLIST`, `STAFF_CHOREOGRAPHY`, `CHOREO_SELECT_STYLE`, `CHOREO_CONFIG_TRACK`.
+- `MenuType` : énumère quelques types logiques utilisés par l'UI : `PLAYER_MAIN`, `PLAYER_STYLES`, `STAFF_MAIN`, `STAFF_DANCER`, `STAFF_PLAYLIST`, `STAFF_CHOREOGRAPHY`, `CHOREO_SELECT_STYLE`, `CHOREO_CONFIG_TRACK`, `STAFF_SKIN_CACHE`.
 
   Note: le menu Paramètres existe bien dans le code, mais il n'est pas encore reflété dans `MenuType`.
 
@@ -88,7 +93,7 @@ if (player.hasPermission("danse.staff")) menuManager.openStaffMain(player);
 
 - Les handlers de clics sont valables uniquement pour l'ouverture courante; ils sont nettoyés au `InventoryClose` (après délai 1 tick pour permettre navigation interne).
 - Si vous ajoutez un nouveau menu `openXXX`, utilisez `beginOpen(...)`, `register(...)`, `fill(...)` et `p.openInventory(inv)` pour rester compatible.
-- Pour créer un one-shot chat prompt, suivez le pattern `OneShot*` (enregistrer le listener, annuler le chat, HandlerList.unregisterAll(this) après réception).
+- Pour créer un one-shot chat prompt, suivez le pattern `OneShot*` (enregistrer le listener, annuler le chat, HandlerList.unregisterAll(this) après réception). Exemple : `OneShotSkinSaver` attend un message `"alias pseudo"`, fetch le skin via `SkinService` et appelle `SkinCacheManager.saveSkin()`.
 
 ---
 

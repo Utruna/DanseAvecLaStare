@@ -50,6 +50,8 @@ public class StaticDancerManager {
     private final Set<String> pausedDancers = new HashSet<>();
     private final Set<String> pausedGroups  = new HashSet<>();
 
+    private SkinCacheManager skinCacheManager;
+
     private static class StaticDancerEntry {
         @SuppressWarnings("deprecation")
         Dummy<PlayerProfile> dummy;
@@ -62,6 +64,7 @@ public class StaticDancerManager {
         String resolvedAnimation;
         String styleName;
         String skinName;
+        String skinAlias;
         Location location;
         double scale = 1.0;
     }
@@ -69,6 +72,10 @@ public class StaticDancerManager {
     public StaticDancerManager(DanseAvecLaStare plugin) {
         this.plugin = plugin;
         globalTask = Bukkit.getScheduler().runTaskTimer(plugin, this::globalTick, 1L, 1L);
+    }
+
+    public void setSkinCacheManager(SkinCacheManager scm) {
+        this.skinCacheManager = scm;
     }
 
     // -------------------------------------------------------------------------
@@ -188,6 +195,26 @@ public class StaticDancerManager {
         }
         removeDancerFromFile(id);
         plugin.getLogger().info("[StaticDancer] Danseur '" + id + "' supprimé.");
+        return true;
+    }
+
+    /**
+     * Applique un nouveau skin à un danseur existant sans le respawner.
+     * Met à jour les bone behaviors du modèle et persiste le changement.
+     *
+     * @param skinAlias alias dans le skin cache (null si skin par nom de joueur)
+     * @param skinName  nom du joueur/label affiché (null si aucun)
+     */
+    @SuppressWarnings("deprecation")
+    public boolean changeDancerSkin(String id, PlayerProfile profile,
+                                    @Nullable String skinName, @Nullable String skinAlias) {
+        StaticDancerEntry entry = activeDancers.get(id);
+        if (entry == null || profile == null) return false;
+        entry.skinProfile = profile;
+        entry.skinName = skinName;
+        entry.skinAlias = skinAlias;
+        applySkinToModel(entry.activeModel, profile);
+        saveDancer(id, entry);
         return true;
     }
 
@@ -314,15 +341,16 @@ public class StaticDancerManager {
      *
      * @return false if the dancer doesn't exist or the profile is null
      */
+    /** Alias de {@link #changeDancerSkin} sans alias cache (skin par nom de joueur). */
     @SuppressWarnings("deprecation")
     public boolean changeSkin(String id, PlayerProfile profile, String skinName) {
-        StaticDancerEntry entry = activeDancers.get(id);
-        if (entry == null || profile == null) return false;
-        entry.skinProfile = profile;
-        entry.skinName    = skinName;
-        if (entry.activeModel != null) applySkinToModel(entry.activeModel, profile);
-        saveDancer(id, entry);
-        return true;
+        return changeDancerSkin(id, profile, skinName, null);
+    }
+
+    /** Retourne l'alias du skin cache utilisé par ce danseur, ou {@code null} s'il n'y en a pas. */
+    public String getDancerSkinAlias(String id) {
+        StaticDancerEntry e = activeDancers.get(id);
+        return e == null ? null : e.skinAlias;
     }
 
     /**
@@ -694,6 +722,7 @@ public class StaticDancerManager {
     // Persistance
     // -------------------------------------------------------------------------
 
+    @SuppressWarnings("deprecation")
     public void loadFromFile() {
         File file = getDancersFile();
         if (!file.exists()) return;
@@ -715,6 +744,7 @@ public class StaticDancerManager {
             float yaw = (float) ds.getDouble("yaw", 0.0);
             String style = ds.getString("style");
             String skin = ds.getString("skin");
+            String skinAlias = ds.getString("skin_alias");
             double scale = ds.getDouble("scale", 1.0);
 
             if (worldName == null || style == null) {
@@ -730,6 +760,21 @@ public class StaticDancerManager {
 
             Location loc = new Location(world, x, y, z, yaw, 0f);
 
+            // Priorité 1 : alias skin cache — instantané, aucun appel Mojang
+            if (skinAlias != null && !skinAlias.isBlank() && skinCacheManager != null) {
+                PlayerProfile cachedProfile = skinCacheManager.getSkin(skinAlias);
+                if (cachedProfile != null) {
+                    spawnStaticDancer(id, loc, style, cachedProfile, skin);
+                    StaticDancerEntry spawned = activeDancers.get(id);
+                    if (spawned != null) spawned.skinAlias = skinAlias;
+                    if (scale != 1.0) setScale(id, scale);
+                    continue;
+                }
+                plugin.getLogger().warning("[StaticDancer] Alias skin '" + skinAlias
+                        + "' introuvable dans le cache pour '" + id + "' — tentative Mojang.");
+            }
+
+            // Priorité 2 : nom de joueur — fetch Mojang async
             if (skin != null && !skin.isBlank()) {
                 final String fId = id, fStyle = style, fSkin = skin;
                 final double fScale = scale;
@@ -796,6 +841,7 @@ public class StaticDancerManager {
         yaml.set(path + ".yaw", (double) entry.location.getYaw());
         yaml.set(path + ".style", entry.styleName);
         yaml.set(path + ".skin", entry.skinName);
+        yaml.set(path + ".skin_alias", entry.skinAlias);
         yaml.set(path + ".scale", entry.scale);
         try {
             yaml.save(file);

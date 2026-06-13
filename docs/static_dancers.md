@@ -17,11 +17,37 @@ Toutes les commandes NPC passent par `/danse npc <sous-commande>`.
 /danse npc highlight <id> [secondes]    Signale un NPC avec des particules (défaut : 3s)
 /danse npc resize <id> <valeur>         Redimensionne le NPC (0.1 – 20.0, défaut : 1.0)
 /danse npc style <id> <style>           Change le style de danse d'un NPC existant
+/danse npc skin <id> <alias>            Applique un skin du cache au NPC (instantané)
 ```
 
 - `spawn` et `move` sont réservés aux joueurs (besoin de leur position).
-- `delete`, `list`, `resize`, `style` et `highlight` sont utilisables depuis la console.
-- La complétion par Tab fonctionne sur les IDs actifs et les styles disponibles.
+- `delete`, `list`, `resize`, `style`, `highlight` et `skin` sont utilisables depuis la console.
+- La complétion par Tab fonctionne sur les IDs actifs, les styles et les alias du cache.
+
+---
+
+## Cache de skins
+
+Le cache de skins permet de pré-récupérer un `PlayerProfile` (textures incluses) et de le réutiliser sans appel Mojang, y compris au redémarrage du serveur.
+
+```
+/danse skin save <alias> <pseudo>   Fetch le skin du joueur et le sauvegarde sous cet alias
+/danse skin apply <alias> <npcId>   Applique le skin en cache au NPC (identique à npc skin)
+/danse skin list                    Liste tous les alias enregistrés
+/danse skin remove <alias>          Supprime un alias du cache
+```
+
+**Workflow typique :**
+1. Connectez-vous avec le skin souhaité.
+2. `/danse skin save dance_girl VotrePseudo`
+3. `/danse npc skin npc1 dance_girl` — le NPC change de skin immédiatement.
+4. Changez de skin : le cache reste inchangé, les NPCs conservent `dance_girl`.
+
+**Avantage principal :** au redémarrage, un NPC lié à un alias se recharge instantanément depuis `skin_cache.yml` sans aucun appel à l'API Mojang.
+
+> **Limitation connue :** si un NPC a été créé avec *votre propre skin* (sans alias explicite), le changement de skin n'est visible qu'après redémarrage du serveur. Pour éviter ce comportement, passez par le cache : sauvegardez votre skin sous un alias et appliquez-le via `/danse npc skin`.
+
+Les alias sont sauvegardés dans `plugins/DanseAvecLaStare/skin_cache.yml` (sérialisation native Bukkit).
 
 ### highlight
 

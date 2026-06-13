@@ -4,6 +4,7 @@ import me.utruna.danse.DanseAvecLaStare;
 import me.utruna.danse.managers.DanceManager;
 import me.utruna.danse.managers.DanceStyle;
 import me.utruna.danse.managers.PlaylistManager;
+import me.utruna.danse.managers.SkinCacheManager;
 import me.utruna.danse.managers.SkinService;
 import me.utruna.danse.managers.StaticDancerManager;
 import net.kyori.adventure.text.Component;
@@ -257,6 +258,13 @@ public class DanceMenuManager {
                         List.of("§7" + pm.getPlaylistIds().size() + " playlist(s)")),
                 (player, click) -> openStaffPlaylistList(player));
 
+        SkinCacheManager scm = plugin.getSkinCacheManager();
+        register(inv, 3,
+                makeIcon(Material.PLAYER_HEAD, "§dSkins en cache",
+                        List.of("§7" + (scm != null ? scm.getAliases().size() : 0) + " alias enregistré(s)",
+                                "§7Sauvegarder, appliquer, supprimer")),
+                (player, click) -> openStaffSkinCache(player, 0));
+
         register(inv, 8,
                 makeIcon(Material.PLAYER_HEAD, "§eJoueurs en ligne",
                         List.of("§7" + Bukkit.getOnlinePlayers().size() + " connecté(s)")),
@@ -381,6 +389,16 @@ public class DanceMenuManager {
                     Bukkit.getPluginManager().registerEvents(
                             new OneShotRenamer(player.getUniqueId(), dancerId), plugin);
                 });
+
+        SkinCacheManager scmDancer = plugin.getSkinCacheManager();
+        if (scmDancer != null && !scmDancer.getAliases().isEmpty()) {
+            String currentAlias = sdm.getDancerSkinAlias(dancerId);
+            register(inv, 15,
+                    makeIcon(Material.LIME_STAINED_GLASS_PANE, "§dSkin depuis cache",
+                            List.of(currentAlias != null ? "§7Actuel: §d" + currentAlias : "§8Aucun alias actif",
+                                    "§7Choisir un skin sauvegardé")),
+                    (player, click) -> openSkinCachePicker(player, dancerId));
+        }
 
         register(inv, 52, makeBack(), (player, click) -> openStaffDancerList(player));
 
@@ -1329,6 +1347,200 @@ public class DanceMenuManager {
                     openStaffMain(player);
                 }
             });
+        }
+
+        @EventHandler
+        public void onInventoryOpen(InventoryOpenEvent e) {
+            if (!e.getPlayer().getUniqueId().equals(viewerId)) return;
+            if (fired) return;
+            fired = true;
+            HandlerList.unregisterAll(this);
+        }
+    }
+
+    // ── §2 Skin cache menus ───────────────────────────────────────────────
+
+    /** Liste les alias du cache. Clic → appliquer à un danseur. Shift+clic → supprimer. */
+    @SuppressWarnings("deprecation")
+    public void openStaffSkinCache(Player viewer, int page) {
+        SkinCacheManager scm = plugin.getSkinCacheManager();
+        List<String> aliases = scm != null ? new ArrayList<>(scm.getAliases()) : List.of();
+        Collections.sort(aliases);
+
+        final int ITEMS_PER_PAGE = 45;
+        int totalPages = Math.max(1, (int) Math.ceil(aliases.size() / (double) ITEMS_PER_PAGE));
+        int clampedPage = Math.max(0, Math.min(page, totalPages - 1));
+        int pageStart = clampedPage * ITEMS_PER_PAGE;
+
+        Inventory inv = beginOpen(viewer, 54,
+                "§dSkins en cache §8(" + (clampedPage + 1) + "/" + totalPages + ")",
+                "staff_skin_cache");
+
+        if (aliases.isEmpty()) {
+            register(inv, 0, makeIcon(Material.BARRIER, "§cAucun skin en cache",
+                    List.of("§7Utilisez §f/danse skin save <alias> <pseudo>",
+                            "§7ou le bouton + ci-dessous")), null);
+        } else {
+            int end = Math.min(pageStart + ITEMS_PER_PAGE, aliases.size());
+            for (int i = pageStart; i < end; i++) {
+                final String alias = aliases.get(i);
+                PlayerProfile profile = scm != null ? scm.getSkin(alias) : null;
+                register(inv, i - pageStart,
+                        makeHeadFromProfile(profile, "§d" + alias,
+                                List.of("§7clic gauche → appliquer à un danseur",
+                                        "§cshift+clic → supprimer du cache")),
+                        (player, click) -> {
+                            if (click == ClickType.SHIFT_LEFT || click == ClickType.SHIFT_RIGHT) {
+                                if (scm != null) scm.removeSkin(alias);
+                                player.sendMessage("§aSkin '§f" + alias + "§a' supprimé du cache.");
+                                openStaffSkinCache(player, clampedPage);
+                            } else {
+                                openSkinCachePicker(player, null, alias);
+                            }
+                        });
+            }
+        }
+
+        if (clampedPage > 0) {
+            register(inv, 47, makeIcon(Material.ARROW, "§6← Page précédente",
+                    List.of("§7Page " + clampedPage + " / " + totalPages)),
+                    (player, click) -> openStaffSkinCache(player, clampedPage - 1));
+        }
+        register(inv, 49, makeIcon(Material.PAPER,
+                "§fPage §e" + (clampedPage + 1) + " §f/ §e" + totalPages,
+                List.of("§7" + aliases.size() + " skin(s) en cache")), null);
+        if (clampedPage < totalPages - 1) {
+            register(inv, 51, makeIcon(Material.ARROW, "§6Page suivante →",
+                    List.of("§7Page " + (clampedPage + 2) + " / " + totalPages)),
+                    (player, click) -> openStaffSkinCache(player, clampedPage + 1));
+        }
+
+        register(inv, 45,
+                makeIcon(Material.EMERALD, "§a+ Sauvegarder un skin",
+                        List.of("§7Tapez: alias pseudo dans le chat")),
+                (player, click) -> {
+                    player.closeInventory();
+                    player.sendMessage("§eTapez §fl'alias §eet le §fpseudo §edans le chat §8(ex: §fdance_girl Steve§8) :");
+                    Bukkit.getPluginManager().registerEvents(
+                            new OneShotSkinSaver(player.getUniqueId()), plugin);
+                });
+
+        register(inv, 53, makeBack(), (player, click) -> openStaffMain(player));
+        fill(inv);
+        viewer.openInventory(inv);
+    }
+
+    /** Picker : choisit un danseur cible pour appliquer un alias. */
+    @SuppressWarnings("deprecation")
+    private void openSkinCachePicker(Player viewer, String dancerId) {
+        SkinCacheManager scm = plugin.getSkinCacheManager();
+        List<String> aliases = scm != null ? new ArrayList<>(scm.getAliases()) : List.of();
+        Collections.sort(aliases);
+
+        Inventory inv = beginOpen(viewer, 54, "§dChoisir un skin — " + (dancerId != null ? dancerId : "?"),
+                "skin_cache_picker:" + dancerId);
+
+        if (aliases.isEmpty()) {
+            register(inv, 0, makeIcon(Material.BARRIER, "§cAucun skin en cache", List.of()), null);
+        } else {
+            for (int i = 0; i < aliases.size() && i < 45; i++) {
+                final String alias = aliases.get(i);
+                PlayerProfile profile = scm.getSkin(alias);
+                register(inv, i,
+                        makeHeadFromProfile(profile, "§d" + alias, List.of("§aclic → appliquer")),
+                        (player, click) -> {
+                            if (dancerId == null) return;
+                            boolean ok = sdm.changeDancerSkin(dancerId, profile, null, alias);
+                            player.sendMessage(ok
+                                    ? "§aSkin '§f" + alias + "§a' appliqué au NPC '§f" + dancerId + "§a'."
+                                    : "§cDanseur introuvable.");
+                            openStaffDancer(player, dancerId);
+                        });
+            }
+        }
+        register(inv, 53, makeBack(), (player, click) -> openStaffDancer(player, dancerId != null ? dancerId : ""));
+        fill(inv);
+        viewer.openInventory(inv);
+    }
+
+    /** Surcharge : choisit d'abord le danseur, puis applique l'alias. */
+    @SuppressWarnings("deprecation")
+    private void openSkinCachePicker(Player viewer, String dancerIdOrNull, String fixedAlias) {
+        List<String> ids = new ArrayList<>(sdm.getDancerIds());
+        Collections.sort(ids);
+
+        Inventory inv = beginOpen(viewer, 54, "§dAppliquer '§f" + fixedAlias + "§d' à …",
+                "skin_alias_apply:" + fixedAlias);
+
+        SkinCacheManager scm = plugin.getSkinCacheManager();
+        if (ids.isEmpty()) {
+            register(inv, 0, makeIcon(Material.BARRIER, "§cAucun NPC actif", List.of()), null);
+        } else {
+            for (int i = 0; i < ids.size() && i < 45; i++) {
+                final String did = ids.get(i);
+                DancerSnapshot snap = snapshotDancer(did);
+                register(inv, i,
+                        makeHeadFromProfile(snap.skinProfile(), "§f" + did,
+                                List.of("§7style: §f" + snap.styleName(), "§aclic → appliquer")),
+                        (player, click) -> {
+                            PlayerProfile p2 = scm != null ? scm.getSkin(fixedAlias) : null;
+                            if (p2 == null) { player.sendMessage("§cAlias introuvable."); return; }
+                            sdm.changeDancerSkin(did, p2, null, fixedAlias);
+                            player.sendMessage("§aSkin '§f" + fixedAlias + "§a' appliqué à '§f" + did + "§a'.");
+                            openStaffSkinCache(player, 0);
+                        });
+            }
+        }
+        register(inv, 53, makeBack(), (player, click) -> openStaffSkinCache(player, 0));
+        fill(inv);
+        viewer.openInventory(inv);
+    }
+
+    /** Saisit "alias pseudo" en chat et sauvegarde le skin dans le cache. */
+    private class OneShotSkinSaver implements Listener {
+        private final UUID viewerId;
+        private volatile boolean fired = false;
+
+        OneShotSkinSaver(UUID viewerId) { this.viewerId = viewerId; }
+
+        @EventHandler
+        public void onChat(AsyncChatEvent e) {
+            if (!e.getPlayer().getUniqueId().equals(viewerId)) return;
+            if (fired) return;
+            fired = true;
+            e.setCancelled(true);
+            HandlerList.unregisterAll(this);
+            String raw = PlainTextComponentSerializer.plainText().serialize(e.message()).trim();
+            String[] parts = raw.split("\\s+", 2);
+            if (parts.length < 2 || parts[0].isBlank() || parts[1].isBlank()) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Player p = Bukkit.getPlayer(viewerId);
+                    if (p != null) {
+                        p.sendMessage("§cFormat invalide. Exemple: §fdance_girl Steve");
+                        openStaffSkinCache(p, 0);
+                    }
+                });
+                return;
+            }
+            String alias = parts[0].toLowerCase(java.util.Locale.ROOT);
+            String skinName = parts[1];
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player p = Bukkit.getPlayer(viewerId);
+                if (p != null) p.sendMessage("§7Récupération du skin de §f" + skinName + "§7...");
+            });
+            SkinService.fetchSkin(plugin, skinName, profile ->
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        Player p = Bukkit.getPlayer(viewerId);
+                        if (p == null) return;
+                        if (profile == null) {
+                            p.sendMessage("§cSkin invalide ou introuvable: §f" + skinName);
+                        } else {
+                            SkinCacheManager scm = plugin.getSkinCacheManager();
+                            if (scm != null) scm.saveSkin(alias, profile);
+                            p.sendMessage("§aSkin de §f" + skinName + "§a sauvegardé sous '§f" + alias + "§a'.");
+                        }
+                        openStaffSkinCache(p, 0);
+                    }));
         }
 
         @EventHandler

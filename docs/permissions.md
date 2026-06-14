@@ -52,18 +52,17 @@ dances:
 ## Cartographie commande → permission (résumé)
 - `/danse <style>` : `danse.style.<style>` (si défini) ou `danse.player` sinon
 - `/danse <style> <pseudo>` : `danse.skin` + permission du style
+- `/danse preview <style>` : `danse.use`
 - `/danse list` / `/danse stop` : `danse.player`
-- `/danse npc <spawn|move|delete|list|highlight|resize|style|skin>` : `danse.static`
+- `/danse fixvisible` (soi-même) : aucune permission spécifique
+- `/danse fixvisible <pseudo>` (autre joueur) : `danse.staff` ou op
+- `/danse npc <spawn|move|delete|list|highlight|resize|style|skin|reloadskins>` : `danse.static`
 - `/danse skin <save|apply|list|remove>` : `danse.static`
-- `/danse choreo ...` : `danse.choreo`
-- `/danse playlist ...` : `danse.playlist` (sauf `play` public = `danse.playlist.play`)
+- `/danse choreo ...` : `danse.admin`
+- `/danse playlist ...` : `danse.playlist` (sauf `set` sur soi-même = `danse.playlist.play`)
+- `/danse reload` : `danse.admin`
 - Menu staff / réglages d'affichage : `danse.staff`
-- `/danse debug` : `danse.debug`
-
-## Comportement de `/danse help`
-- Affiche uniquement les sections pour lesquelles le joueur a la permission.
-- Les commandes auxquelles le joueur n'a pas accès sont affichées en grisé (ex.: affichage informatif).
-- La console voit toutes les sections sans filtrage.
+- `/danse debug` : aucune permission (toggle par joueur)
 
 ## Exemple d'assignation (LuckPerms)
 - Joueur: `lp group joueur permission set danse.player true`

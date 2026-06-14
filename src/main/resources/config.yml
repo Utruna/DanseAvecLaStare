@@ -66,6 +66,25 @@ dance:
   # Mettre à 0 pour désactiver la limite.
   maxConcurrent: 0
 
+staticDancer:
+  # Fréquence du tick global qui vérifie et relance les animations arrêtées (en ticks).
+  # 1 = 20 vérifications/sec/danseur (précis mais lourd). 4 = 5/sec (recommandé pour 50+ NPCs).
+  # Augmenter si le serveur a beaucoup de danseurs statiques et que le CPU est élevé.
+  animTickPeriod: 4
+  # Nombre de danseurs chargés par lot au démarrage du serveur.
+  loadBatchSize: 10
+  # Intervalle en ticks entre chaque lot de chargement.
+  # loadBatchSize: 10 + loadTickDelay: 6  → 170 danseurs en ~102 ticks (~5s)
+  # loadBatchSize: 10 + loadTickDelay: 12 → 170 danseurs en ~204 ticks (~10s)
+  loadTickDelay: 6
+  # Active le refresh des entités ModelEngine au join d'un joueur.
+  # Si false (défaut), ME4 gère la visibilité nativement — aucun lag au join.
+  # Activer uniquement si les NPCs n'apparaissent pas aux joueurs qui se connectent.
+  refreshOnJoin: false
+  # Nombre de danseurs traités par tick lors du refresh au join (si refreshOnJoin: true).
+  # Valeur basse = moins de lag au join, mais le refresh prend plus de ticks.
+  refreshBatchSize: 10
+
 worlds:
   allowedWorlds: []
   deniedWorlds: []

@@ -9,20 +9,23 @@ Les danseurs statiques sont des entités ModelEngine indépendantes des joueurs,
 Toutes les commandes NPC passent par `/danse npc <sous-commande>`.
 
 ```
-/danse npc spawn <id> <style>           Pose un NPC à ta position avec ton skin
-/danse npc spawn <id> <style> <pseudo>  Idem avec le skin d'un autre joueur (Mojang async)
-/danse npc move <id>                    Déplace le NPC à ta position actuelle
-/danse npc delete <id>                  Supprime le NPC et l'efface de la sauvegarde
-/danse npc list                         Liste tous les IDs actifs
-/danse npc highlight <id> [secondes]    Signale un NPC avec des particules (défaut : 3s)
-/danse npc resize <id> <valeur>         Redimensionne le NPC (0.1 – 20.0, défaut : 1.0)
-/danse npc style <id> <style>           Change le style de danse d'un NPC existant
-/danse npc skin <id> <alias>            Applique un skin du cache au NPC (instantané)
+/danse npc spawn <id> <style>             Pose un NPC à ta position avec ton skin
+/danse npc spawn <id> <style> <pseudo>    Idem avec le skin d'un autre joueur (Mojang async)
+/danse npc move <id>                      Déplace le NPC à ta position actuelle
+/danse npc delete <id>                    Supprime le NPC et l'efface de la sauvegarde
+/danse npc list                           Liste tous les IDs actifs
+/danse npc list <distance>                Liste les NPCs dans un rayon en blocs, triés par distance
+/danse npc highlight <id> [secondes]      Signale un NPC avec des particules (défaut : 3s)
+/danse npc resize <id> <valeur>           Redimensionne le NPC (0.1 – 20.0, défaut : 1.0)
+/danse npc style <id> <style>             Change le style de danse d'un NPC existant
+/danse npc skin <id> <alias>              Applique un skin du cache au NPC (instantané)
+/danse npc reloadskins                    Recharge les skins de tous les NPCs actifs
+/danse npc reloadskins <pseudo>           Recharge uniquement les NPCs liés à ce pseudo (name-based)
 ```
 
 - `spawn` et `move` sont réservés aux joueurs (besoin de leur position).
-- `delete`, `list`, `resize`, `style`, `highlight` et `skin` sont utilisables depuis la console.
-- La complétion par Tab fonctionne sur les IDs actifs, les styles et les alias du cache.
+- `delete`, `list`, `resize`, `style`, `highlight`, `skin` et `reloadskins` sont utilisables depuis la console.
+- La complétion par Tab fonctionne sur les IDs actifs, les styles, les alias du cache et les joueurs en ligne.
 
 ---
 
@@ -46,6 +49,17 @@ Le cache de skins permet de pré-récupérer un `PlayerProfile` (textures inclus
 **Avantage principal :** au redémarrage, un NPC lié à un alias se recharge instantanément depuis `skin_cache.yml` sans aucun appel à l'API Mojang.
 
 > **Limitation connue :** si un NPC a été créé avec *votre propre skin* (sans alias explicite), le changement de skin n'est visible qu'après redémarrage du serveur. Pour éviter ce comportement, passez par le cache : sauvegardez votre skin sous un alias et appliquez-le via `/danse npc skin`.
+
+### reloadskins
+
+Recharge les skins des danseurs actifs sans redémarrer le serveur :
+
+- **Sans filtre** (`/danse npc reloadskins`) : itère sur tous les NPCs.
+  - Alias-based → relit le `PlayerProfile` depuis `SkinCacheManager` et l'applique **immédiatement** (aucun appel réseau).
+  - Name-based → re-fetch Mojang async, applique sur le thread principal à réception.
+- **Avec filtre** (`/danse npc reloadskins <pseudo>`) : traite uniquement les NPCs name-based dont le `skinName` correspond à ce pseudo (les alias-based sont ignorés).
+
+Retourne le nombre d'opérations lancées dans le message de confirmation.
 
 Les alias sont sauvegardés dans `plugins/DanseAvecLaStare/skin_cache.yml` (sérialisation native Bukkit).
 
@@ -78,6 +92,7 @@ dancers:
     yaw: 90.0
     style: dj
     skin: Utruna
+    skin_alias: dance_girl
     scale: 1.5
   danseur_accueil:
     world: world
@@ -87,13 +102,15 @@ dancers:
     yaw: 180.0
     style: twist
     skin: Notch
+    skin_alias: null
     scale: 1.0
 ```
 
-- `skin` : pseudo du joueur dont le skin est utilisé. Null = skin par défaut (Steve/Alex).
+- `skin` : pseudo du joueur dont le skin est utilisé (label affiché). Null = skin par défaut (Steve/Alex).
+- `skin_alias` : alias dans `skin_cache.yml`. Si présent, le skin est rechargé depuis le cache au démarrage (aucun appel Mojang). Si absent ou introuvable, fallback sur `skin` via Mojang async.
 - `scale` : facteur d'échelle du modèle (défaut : `1.0`, max : `20.0`). Persisté dans le YAML et restauré au redémarrage.
 - Le fichier est géré automatiquement. Ne pas modifier manuellement sauf pour corriger une entrée.
-- Au **redémarrage**, les danseurs sont restaurés avec un délai de 3 secondes (60 ticks) pour laisser ModelEngine charger ses blueprints.
+- Au **redémarrage**, les danseurs sont restaurés avec un délai de 60 ticks (3 s) pour laisser ModelEngine charger ses blueprints. Les spawns sont étalés par lots (configurable via `staticDancer.loadBatchSize` et `staticDancer.loadTickDelay`). Les chorégraphies sont rechargées après les danseurs + 20 ticks de marge pour les fetches de skin async.
 - Au **onDisable**, les entités sont détruites mais le fichier est conservé.
 
 ---

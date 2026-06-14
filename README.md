@@ -40,8 +40,10 @@ Copier le JAR `target/DanseAvecLaStare-*.jar` dans `plugins/` puis redémarrer.
 |---|---|
 | `/danse <style>` | Lance une danse avec ton skin |
 | `/danse <style> <pseudo>` | Lance une danse avec le skin d'un autre joueur |
+| `/danse preview <style> [duréeTicks]` | Aperçu d'un style pendant N ticks (défaut config) |
 | `/danse stop` | Arrête la danse |
 | `/danse list` | Liste les styles disponibles |
+| `/danse fixvisible [pseudo]` | Rétablit la visibilité bloquée (soi-même ou cible staff) |
 | `/danse debug` | Active/désactive les logs de diagnostic |
 
 **NPC (danseurs statiques)**
@@ -52,11 +54,23 @@ Copier le JAR `target/DanseAvecLaStare-*.jar` dans `plugins/` puis redémarrer.
 | `/danse npc move <id>` | Déplace un NPC à ta position |
 | `/danse npc delete <id>` | Supprime un NPC |
 | `/danse npc list` | Liste les NPCs actifs |
+| `/danse npc list <distance>` | Liste les NPCs dans un rayon en blocs |
 | `/danse npc style <id> <style>` | Change le style de danse d'un NPC |
+| `/danse npc skin <id> <alias>` | Applique un skin du cache au NPC (instantané) |
+| `/danse npc reloadskins [pseudo]` | Recharge les skins (tous ou filtrés par pseudo) |
 | `/danse npc resize <id> <valeur>` | Redimensionne un NPC (0.1 – 20.0) |
 | `/danse npc highlight <id> [secondes]` | Signale un NPC avec des particules |
 
 Les danseurs statiques sont sauvegardés automatiquement et restaurés au redémarrage.
+
+**Cache de skins** — pré-enregistrement de skins réutilisables sans appel Mojang
+
+| Commande | Description |
+|---|---|
+| `/danse skin save <alias> <pseudo>` | Fetch le skin du joueur et le sauvegarde sous cet alias |
+| `/danse skin apply <alias> <npcId>` | Applique le skin en cache au NPC |
+| `/danse skin list` | Liste tous les alias enregistrés |
+| `/danse skin remove <alias>` | Supprime un alias du cache |
 
 **Chorégraphie** — synchronisation de groupes de danseurs statiques
 
@@ -79,9 +93,9 @@ Les danseurs statiques sont sauvegardés automatiquement et restaurés au redém
 | `/danse playlist delete <id>` | Supprime la playlist |
 | `/danse playlist info <id>` | Affiche les pistes de la playlist |
 | `/danse playlist list` | Liste toutes les playlists |
-| `/danse playlist play <id> player [pseudo]` | Lance la playlist sur un joueur |
-| `/danse playlist play <id> dancer <dancerId>` | Lance la playlist sur un danseur statique |
-| `/danse playlist play <id> group <groupId>` | Lance la playlist sur un groupe |
+| `/danse playlist set <id> player [pseudo]` | Lance la playlist sur un joueur |
+| `/danse playlist set <id> dancer <dancerId>` | Lance la playlist sur un danseur statique |
+| `/danse playlist set <id> group <groupId>` | Lance la playlist sur un groupe |
 | `/danse playlist stop player [pseudo]` | Arrête la playlist d'un joueur |
 | `/danse playlist stop dancer <dancerId>` | Arrête la playlist d'un danseur |
 | `/danse playlist stop group <groupId>` | Arrête la playlist d'un groupe |

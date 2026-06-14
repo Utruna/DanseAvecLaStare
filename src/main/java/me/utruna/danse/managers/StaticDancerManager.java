@@ -71,7 +71,8 @@ public class StaticDancerManager {
 
     public StaticDancerManager(DanseAvecLaStare plugin) {
         this.plugin = plugin;
-        globalTask = Bukkit.getScheduler().runTaskTimer(plugin, this::globalTick, 1L, 1L);
+        long tickPeriod = Math.max(1L, plugin.getConfig().getLong("staticDancer.animTickPeriod", 4L));
+        globalTask = Bukkit.getScheduler().runTaskTimer(plugin, this::globalTick, 1L, tickPeriod);
     }
 
     public void setSkinCacheManager(SkinCacheManager scm) {
@@ -85,6 +86,13 @@ public class StaticDancerManager {
     @SuppressWarnings("deprecation")
     public boolean spawnStaticDancer(String id, Location location, String danceStyleName,
                                      @Nullable PlayerProfile skinProfile, @Nullable String skinName) {
+        return spawnStaticDancer(id, location, danceStyleName, skinProfile, skinName, true);
+    }
+
+    @SuppressWarnings("deprecation")
+    boolean spawnStaticDancer(String id, Location location, String danceStyleName,
+                              @Nullable PlayerProfile skinProfile, @Nullable String skinName,
+                              boolean persist) {
         if (activeDancers.containsKey(id)) {
             return false;
         }
@@ -157,7 +165,7 @@ public class StaticDancerManager {
             // Le global tick gère toutes les animations (individuel et groupe).
 
             activeDancers.put(id, entry);
-            saveDancer(id, entry);
+            if (persist) saveDancer(id, entry);
             plugin.getLogger().info("[StaticDancer] Danseur '" + id + "' apparu (style=" + danceStyleName + ", blueprint=" + blueprintId + ")");
             return true;
 
@@ -243,11 +251,15 @@ public class StaticDancerManager {
     }
 
     public boolean setScale(String id, double scale) {
+        return setScale(id, scale, true);
+    }
+
+    private boolean setScale(String id, double scale, boolean persist) {
         StaticDancerEntry entry = activeDancers.get(id);
         if (entry == null || entry.activeModel == null) return false;
         entry.scale = scale;
         entry.activeModel.setScale(scale);
-        saveDancer(id, entry);
+        if (persist) saveDancer(id, entry);
         return true;
     }
 
@@ -336,11 +348,6 @@ public class StaticDancerManager {
         }
     }
 
-    /**
-     * Applies a new skin profile to an active dancer and persists the change.
-     *
-     * @return false if the dancer doesn't exist or the profile is null
-     */
     /** Alias de {@link #changeDancerSkin} sans alias cache (skin par nom de joueur). */
     @SuppressWarnings("deprecation")
     public boolean changeSkin(String id, PlayerProfile profile, String skinName) {
@@ -351,6 +358,55 @@ public class StaticDancerManager {
     public String getDancerSkinAlias(String id) {
         StaticDancerEntry e = activeDancers.get(id);
         return e == null ? null : e.skinAlias;
+    }
+
+    /**
+     * Recharge les skins de tous les danseurs actifs (ou uniquement ceux dont le {@code skinName}
+     * correspond à {@code filterPlayerName} si non-null).
+     * <ul>
+     *   <li>Alias-based : ré-appliqué depuis {@link SkinCacheManager} immédiatement.</li>
+     *   <li>Name-based : re-fetch via {@link SkinService} (async, mise à jour différée).</li>
+     * </ul>
+     *
+     * @param filterPlayerName pseudo à filtrer, ou {@code null} pour tout recharger
+     * @return nombre d'opérations de rechargement lancées
+     */
+    @SuppressWarnings("deprecation")
+    public int reloadSkins(@Nullable String filterPlayerName) {
+        int count = 0;
+        for (Map.Entry<String, StaticDancerEntry> mapEntry : new ArrayList<>(activeDancers.entrySet())) {
+            String id = mapEntry.getKey();
+            StaticDancerEntry entry = mapEntry.getValue();
+
+            if (filterPlayerName != null) {
+                // Mode filtré : uniquement les name-based correspondant au pseudo
+                if (entry.skinAlias != null
+                        || entry.skinName == null
+                        || !entry.skinName.equalsIgnoreCase(filterPlayerName)) continue;
+            }
+
+            if (entry.skinAlias != null && skinCacheManager != null) {
+                PlayerProfile cached = skinCacheManager.getSkin(entry.skinAlias);
+                if (cached != null) {
+                    entry.skinProfile = cached;
+                    applySkinToModel(entry.activeModel, cached);
+                    count++;
+                }
+            } else if (entry.skinName != null) {
+                final String fId = id;
+                final String fSkin = entry.skinName;
+                SkinService.fetchSkin(plugin, fSkin, profile ->
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            if (profile == null) return;
+                            StaticDancerEntry e = activeDancers.get(fId);
+                            if (e == null) return;
+                            e.skinProfile = profile;
+                            applySkinToModel(e.activeModel, profile);
+                        }));
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
@@ -551,25 +607,36 @@ public class StaticDancerManager {
     }
 
     /**
-     * Respawn propre de tous les danseurs actifs pour renvoyer les packets à un joueur qui vient de se connecter.
-     * On détruit et recrée chaque ModeledEntity (en conservant le même Dummy) afin que ME4 envoie
-     * un spawn packet frais — un simple registerSelf() peut laisser l'ActiveModel détaché côté ME4,
-     * ce qui provoque la disparition du modèle à la fin de l'animation en cours.
+     * Respawn propre des danseurs pour envoyer les packets de spawn au joueur entrant.
+     * Les swapModel sont répartis par lots sur plusieurs ticks pour éviter de bloquer
+     * le thread principal quand le nombre de danseurs est élevé.
      */
-    /** Respawn propre des danseurs pour envoyer les packets de spawn au joueur entrant. */
     public void refreshForPlayer(Player player) {
-        for (Map.Entry<String, StaticDancerEntry> mapEntry : new ArrayList<>(activeDancers.entrySet())) {
-            String id = mapEntry.getKey();
-            StaticDancerEntry entry = mapEntry.getValue();
-            if (entry.currentBlueprintId == null || entry.dummy == null) continue;
-            try {
-                if (swapModel(entry, entry.currentBlueprintId) && entry.resolvedAnimation != null && entry.activeModel != null) {
-                    entry.activeModel.getAnimationHandler().playAnimation(
-                            entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
+        List<Map.Entry<String, StaticDancerEntry>> entries = new ArrayList<>(activeDancers.entrySet());
+        if (entries.isEmpty()) return;
+
+        int batchSize = Math.max(1, plugin.getConfig().getInt("staticDancer.refreshBatchSize", 10));
+
+        for (int i = 0; i < entries.size(); i += batchSize) {
+            final List<Map.Entry<String, StaticDancerEntry>> batch =
+                    new ArrayList<>(entries.subList(i, Math.min(i + batchSize, entries.size())));
+            final long delay = (long) (i / batchSize);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                for (Map.Entry<String, StaticDancerEntry> mapEntry : batch) {
+                    StaticDancerEntry entry = mapEntry.getValue();
+                    if (entry.currentBlueprintId == null || entry.dummy == null) continue;
+                    try {
+                        if (swapModel(entry, entry.currentBlueprintId)
+                                && entry.resolvedAnimation != null && entry.activeModel != null) {
+                            entry.activeModel.getAnimationHandler()
+                                    .playAnimation(entry.resolvedAnimation, 0.0, 0.0, 1.0, true);
+                        }
+                    } catch (Exception e) {
+                        plugin.getLogger().log(Level.WARNING,
+                                "[StaticDancer] Erreur refreshForPlayer pour '" + mapEntry.getKey() + "'", e);
+                    }
                 }
-            } catch (Exception e) {
-                plugin.getLogger().log(Level.WARNING, "[StaticDancer] Erreur refreshForPlayer pour '" + id + "'", e);
-            }
+            }, delay);
         }
     }
 
@@ -640,10 +707,6 @@ public class StaticDancerManager {
     // -------------------------------------------------------------------------
 
     /**
-     * Annule la tâche d'animation individuelle du danseur sans le détruire.
-     * Appelé par PlaylistManager quand il prend le contrôle des animations.
-     */
-    /**
      * Suspend temporairement l'animation du danseur dans le global tick.
      * Ajoute {@code id} à {@code pausedDancers} ; le global tick ignorera ce danseur
      * jusqu'à ce que {@link #resumeAnimationTask(String)} soit appelé.
@@ -654,10 +717,6 @@ public class StaticDancerManager {
         dbg("pauseAnimationTask('" + id + "') → marqué en pause");
     }
 
-    /**
-     * Relance la tâche d'animation individuelle (danseur hors groupe uniquement).
-     * Appelé par PlaylistManager quand il rend le contrôle.
-     */
     /**
      * Reprend l'animation du danseur dans le global tick.
      * Retire {@code id} de {@code pausedDancers} ; le global tick reprend la main au tick suivant.
@@ -672,10 +731,6 @@ public class StaticDancerManager {
     }
 
     /**
-     * Annule la tâche partagée du groupe sans dissoudre le groupe.
-     * Appelé par PlaylistManager pour éviter les conflits avec ses propres transitions.
-     */
-    /**
      * Suspend temporairement l'animation de tous les membres du groupe dans le global tick.
      * Ajoute {@code groupId} à {@code pausedGroups} sans dissoudre le groupe ni annuler de tâche.
      */
@@ -684,10 +739,6 @@ public class StaticDancerManager {
         dbg("pauseGroupTask('" + groupId + "') → marqué en pause");
     }
 
-    /**
-     * Relance la tâche partagée du groupe SANS re-synchroniser les animations.
-     * Appelé par PlaylistManager quand il rend le contrôle du groupe.
-     */
     /**
      * Reprend l'animation du groupe dans le global tick sans re-synchroniser.
      * Retire {@code groupId} de {@code pausedGroups} ; le global tick reprend la main au tick suivant.
@@ -722,79 +773,110 @@ public class StaticDancerManager {
     // Persistance
     // -------------------------------------------------------------------------
 
+    /**
+     * Charge les danseurs depuis le fichier et étale les spawns sur plusieurs ticks.
+     *
+     * @return nombre de ticks avant que le dernier lot soit spawné (utile pour
+     *         planifier le chargement des chorégraphies après coup)
+     */
     @SuppressWarnings("deprecation")
-    public void loadFromFile() {
+    public long loadFromFile() {
         File file = getDancersFile();
-        if (!file.exists()) return;
+        if (!file.exists()) return 0L;
 
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         ConfigurationSection section = yaml.getConfigurationSection("dancers");
-        if (section == null) return;
+        if (section == null) return 0L;
 
         plugin.getLogger().info("[StaticDancer] Restauration des danseurs depuis " + file.getName() + "...");
+
+        // Lecture du YAML en mémoire (thread principal, instantané)
+        record DancerData(String id, Location loc, String style, String skin, String skinAlias, double scale) {}
+        List<DancerData> entries = new ArrayList<>();
 
         for (String id : section.getKeys(false)) {
             ConfigurationSection ds = section.getConfigurationSection(id);
             if (ds == null) continue;
 
             String worldName = ds.getString("world");
-            double x = ds.getDouble("x");
-            double y = ds.getDouble("y");
-            double z = ds.getDouble("z");
-            float yaw = (float) ds.getDouble("yaw", 0.0);
-            String style = ds.getString("style");
-            String skin = ds.getString("skin");
-            String skinAlias = ds.getString("skin_alias");
-            double scale = ds.getDouble("scale", 1.0);
-
+            String style    = ds.getString("style");
             if (worldName == null || style == null) {
                 plugin.getLogger().warning("[StaticDancer] Entrée invalide dans le fichier, ignorée: " + id);
                 continue;
             }
-
             World world = Bukkit.getWorld(worldName);
             if (world == null) {
                 plugin.getLogger().warning("[StaticDancer] Monde '" + worldName + "' non chargé, danseur ignoré: " + id);
                 continue;
             }
-
-            Location loc = new Location(world, x, y, z, yaw, 0f);
-
-            // Priorité 1 : alias skin cache — instantané, aucun appel Mojang
-            if (skinAlias != null && !skinAlias.isBlank() && skinCacheManager != null) {
-                PlayerProfile cachedProfile = skinCacheManager.getSkin(skinAlias);
-                if (cachedProfile != null) {
-                    spawnStaticDancer(id, loc, style, cachedProfile, skin);
-                    StaticDancerEntry spawned = activeDancers.get(id);
-                    if (spawned != null) spawned.skinAlias = skinAlias;
-                    if (scale != 1.0) setScale(id, scale);
-                    continue;
-                }
-                plugin.getLogger().warning("[StaticDancer] Alias skin '" + skinAlias
-                        + "' introuvable dans le cache pour '" + id + "' — tentative Mojang.");
-            }
-
-            // Priorité 2 : nom de joueur — fetch Mojang async
-            if (skin != null && !skin.isBlank()) {
-                final String fId = id, fStyle = style, fSkin = skin;
-                final double fScale = scale;
-                SkinService.fetchSkin(plugin, skin, profile ->
-                        Bukkit.getScheduler().runTask(plugin, () -> {
-                            if (profile == null) {
-                                plugin.getLogger().warning("[StaticDancer] Skin invalide pour '" + fId
-                                        + "' (skin: '" + fSkin + "') — danseur supprimé du fichier.");
-                                removeDancerFromFile(fId);
-                                return;
-                            }
-                            spawnStaticDancer(fId, loc, fStyle, profile, fSkin);
-                            if (fScale != 1.0) setScale(fId, fScale);
-                        })
-                );
-            } else {
-                spawnStaticDancer(id, loc, style, null, null);
-                if (scale != 1.0) setScale(id, scale);
-            }
+            entries.add(new DancerData(
+                    id,
+                    new Location(world, ds.getDouble("x"), ds.getDouble("y"), ds.getDouble("z"),
+                            (float) ds.getDouble("yaw", 0.0), 0f),
+                    style,
+                    ds.getString("skin"),
+                    ds.getString("skin_alias"),
+                    ds.getDouble("scale", 1.0)
+            ));
         }
+
+        // Spawn par lots pour étaler la charge sur plusieurs ticks (comme le faisaient
+        // naturellement les réponses async Mojang avant l'ajout du cache de skins).
+        int batchSize  = Math.max(1, plugin.getConfig().getInt("staticDancer.loadBatchSize", 10));
+        long tickDelay = Math.max(1L, plugin.getConfig().getLong("staticDancer.loadTickDelay", 6L));
+
+        for (int i = 0; i < entries.size(); i += batchSize) {
+            final List<DancerData> batch =
+                    new ArrayList<>(entries.subList(i, Math.min(i + batchSize, entries.size())));
+            final long delay = ((long) (i / batchSize)) * tickDelay;
+
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                for (DancerData data : batch) {
+                    spawnStaticDancer(data.id(), data.loc(), data.style(), null, data.skin(), false);
+
+                    StaticDancerEntry entry = activeDancers.get(data.id());
+                    if (entry == null) continue;
+                    entry.skinAlias = data.skinAlias();
+                    if (data.scale() != 1.0) setScale(data.id(), data.scale(), false);
+
+                    // Appliquer le skin immédiatement si en cache, sinon fetch Mojang async
+                    if (data.skinAlias() != null && !data.skinAlias().isBlank() && skinCacheManager != null) {
+                        PlayerProfile cached = skinCacheManager.getSkin(data.skinAlias());
+                        if (cached != null) {
+                            entry.skinProfile = cached;
+                            applySkinToModel(entry.activeModel, cached);
+                        } else {
+                            plugin.getLogger().warning("[StaticDancer] Alias skin '" + data.skinAlias()
+                                    + "' introuvable dans le cache pour '" + data.id() + "' — tentative Mojang.");
+                            if (data.skin() != null && !data.skin().isBlank()) {
+                                scheduleLoadSkinFetch(data.id(), data.skin());
+                            }
+                        }
+                    } else if (data.skin() != null && !data.skin().isBlank()) {
+                        scheduleLoadSkinFetch(data.id(), data.skin());
+                    }
+                }
+            }, delay);
+        }
+
+        int batchCount = entries.isEmpty() ? 0 : (int) Math.ceil((double) entries.size() / batchSize);
+        return (batchCount == 0) ? 0L : ((long) (batchCount - 1)) * tickDelay + 1L;
+    }
+
+    private void scheduleLoadSkinFetch(String id, String skinName) {
+        SkinService.fetchSkin(plugin, skinName, profile ->
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    StaticDancerEntry e = activeDancers.get(id);
+                    if (e == null) return;
+                    if (profile == null) {
+                        plugin.getLogger().warning("[StaticDancer] Skin invalide pour '" + id
+                                + "' (skin: '" + skinName + "') — skin par défaut conservé.");
+                        return;
+                    }
+                    e.skinProfile = profile;
+                    applySkinToModel(e.activeModel, profile);
+                })
+        );
     }
 
     /**
@@ -933,15 +1015,6 @@ public class StaticDancerManager {
         return section == null ? null : section.getString("modelId");
     }
 
-    /**
-     * Remplace l'ActiveModel d'une entrée par un nouveau blueprint.
-     * Tente de retirer l'ancien via reflection, ajoute le nouveau et réapplique le skin.
-     */
-    /**
-     * Remplace le modèle actif d'une entrée sans toucher au Dummy ni à la ModeledEntity.
-     * Utilise directement l'API ME4 pour retirer l'ancien modèle et ajouter le nouveau —
-     * la rotation du Dummy est ainsi préservée sans aucun respawn.
-     */
     /**
      * Remplace le modèle en détruisant le ModeledEntity (despawn visuel propre)
      * tout en réutilisant le même Dummy — sa rotation est préservée, pas de glitch.

@@ -119,9 +119,10 @@ public class StaticDancerManager {
         }
 
         try {
+            String safeName = id.replaceAll("[^a-zA-Z0-9_]", "_");
             PlayerProfile effectiveProfile = skinProfile != null
                     ? skinProfile
-                    : Bukkit.createPlayerProfile(UUID.randomUUID(), id.substring(0, Math.min(id.length(), 16)));
+                    : Bukkit.createPlayerProfile(UUID.randomUUID(), safeName.substring(0, Math.min(safeName.length(), 16)));
 
             Dummy<PlayerProfile> dummy = new Dummy<>(effectiveProfile);
             dummy.setLocation(location);
@@ -166,7 +167,6 @@ public class StaticDancerManager {
 
             activeDancers.put(id, entry);
             if (persist) saveDancer(id, entry);
-            plugin.getLogger().info("[StaticDancer] Danseur '" + id + "' apparu (style=" + danceStyleName + ", blueprint=" + blueprintId + ")");
             return true;
 
         } catch (Exception e) {
@@ -402,6 +402,9 @@ public class StaticDancerManager {
                             if (e == null) return;
                             e.skinProfile = profile;
                             applySkinToModel(e.activeModel, profile);
+                            if (skinCacheManager != null) {
+                                skinCacheManager.saveSkin(fSkin, profile);
+                            }
                         }));
                 count++;
             }
@@ -832,27 +835,30 @@ public class StaticDancerManager {
 
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 for (DancerData data : batch) {
-                    spawnStaticDancer(data.id(), data.loc(), data.style(), null, data.skin(), false);
+                    // Résoudre le profil depuis le cache avant de spawner
+                    PlayerProfile cachedProfile = null;
+                    if (skinCacheManager != null) {
+                        if (data.skinAlias() != null && !data.skinAlias().isBlank()) {
+                            cachedProfile = skinCacheManager.getSkin(data.skinAlias());
+                        }
+                        if (cachedProfile == null && data.skin() != null && !data.skin().isBlank()) {
+                            cachedProfile = skinCacheManager.getSkin(data.skin());
+                        }
+                    }
+
+                    spawnStaticDancer(data.id(), data.loc(), data.style(), cachedProfile, data.skin(), false);
 
                     StaticDancerEntry entry = activeDancers.get(data.id());
                     if (entry == null) continue;
                     entry.skinAlias = data.skinAlias();
                     if (data.scale() != 1.0) setScale(data.id(), data.scale(), false);
 
-                    // Appliquer le skin immédiatement si en cache, sinon fetch Mojang async
-                    if (data.skinAlias() != null && !data.skinAlias().isBlank() && skinCacheManager != null) {
-                        PlayerProfile cached = skinCacheManager.getSkin(data.skinAlias());
-                        if (cached != null) {
-                            entry.skinProfile = cached;
-                            applySkinToModel(entry.activeModel, cached);
-                        } else {
+                    // Si le profil n'était pas en cache, fetch Mojang (et sauvegarde automatique dans scheduleLoadSkinFetch)
+                    if (cachedProfile == null && data.skin() != null && !data.skin().isBlank()) {
+                        if (data.skinAlias() != null && !data.skinAlias().isBlank()) {
                             plugin.getLogger().warning("[StaticDancer] Alias skin '" + data.skinAlias()
                                     + "' introuvable dans le cache pour '" + data.id() + "' — tentative Mojang.");
-                            if (data.skin() != null && !data.skin().isBlank()) {
-                                scheduleLoadSkinFetch(data.id(), data.skin());
-                            }
                         }
-                    } else if (data.skin() != null && !data.skin().isBlank()) {
                         scheduleLoadSkinFetch(data.id(), data.skin());
                     }
                 }
@@ -875,6 +881,9 @@ public class StaticDancerManager {
                     }
                     e.skinProfile = profile;
                     applySkinToModel(e.activeModel, profile);
+                    if (skinCacheManager != null) {
+                        skinCacheManager.saveSkin(skinName, profile);
+                    }
                 })
         );
     }

@@ -86,7 +86,10 @@ public class SkinService {
         if (noiseFilterInstalled) return;
         noiseFilterInstalled = true;
         try {
-            AbstractFilter filter = new AbstractFilter() {
+            LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
+
+            // Supprime le WARN "Couldn't look up profile properties" de l'authlib (rate-limit Mojang 429)
+            AbstractFilter authlibFilter = new AbstractFilter() {
                 private Result check(String msg) {
                     return msg != null && msg.startsWith("Couldn't look up profile properties")
                             ? Result.DENY : Result.NEUTRAL;
@@ -107,10 +110,42 @@ public class SkinService {
                     return check(String.valueOf(msg));
                 }
             };
-            filter.start();
-            ((LoggerContext) LogManager.getContext(false))
-                    .getLogger("com.mojang.authlib.yggdrasil.YggdrasilMinecraftSessionService")
-                    .addFilter(filter);
+            authlibFilter.start();
+            ctx.getLogger("com.mojang.authlib.yggdrasil.YggdrasilMinecraftSessionService")
+                    .addFilter(authlibFilter);
+
+            // Supprime le WARN+stacktrace "MineSkinException: Job is not completed yet" de ModelEngine.
+            // C'est un faux positif : MineSkin génère les données de limb de façon async et renvoie
+            // ce statut tant que le job n'est pas terminé — il se complète toujours quelques secondes
+            // plus tard ("Limb data generated"). ModelEngine le logue comme erreur alors que c'est normal.
+            AbstractFilter mineSkinFilter = new AbstractFilter() {
+                private boolean isNoise(Throwable t) {
+                    for (; t != null; t = t.getCause()) {
+                        String m = t.getMessage();
+                        if ((m != null && m.contains("Job is not completed yet"))
+                                || t.getClass().getName().contains("MineSkinException")) return true;
+                    }
+                    return false;
+                }
+                @Override public Result filter(LogEvent event) {
+                    return isNoise(event.getThrown()) ? Result.DENY : Result.NEUTRAL;
+                }
+                @Override public Result filter(org.apache.logging.log4j.core.Logger logger,
+                                               Level level, Marker marker, String msg, Object... p) {
+                    return Result.NEUTRAL;
+                }
+                @Override public Result filter(org.apache.logging.log4j.core.Logger logger,
+                                               Level level, Marker marker, Message msg, Throwable t) {
+                    return isNoise(t) ? Result.DENY : Result.NEUTRAL;
+                }
+                @Override public Result filter(org.apache.logging.log4j.core.Logger logger,
+                                               Level level, Marker marker, Object msg, Throwable t) {
+                    return isNoise(t) ? Result.DENY : Result.NEUTRAL;
+                }
+            };
+            mineSkinFilter.start();
+            ctx.getRootLogger().addFilter(mineSkinFilter);
+
         } catch (Throwable ignored) {
             // Log4j2-core absent, non initialisé (tests unitaires) ou version incompatible
         }

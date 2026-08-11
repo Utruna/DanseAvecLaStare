@@ -65,8 +65,6 @@ public class DanseAvecLaStare extends JavaPlugin {
         staticDancerManager.setPlaylistManager(playlistManager);
         playlistManager.loadFromFile();
 
-        getLogger().info("Option useModelEngine=" + getConfig().getBoolean("useModelEngine", false));
-
         if (getServer().getPluginManager().isPluginEnabled("ModelEngine")) {
             checkModelEngineBlueprints();
             // Délai de 60 ticks (3s) : ModelEngine charge ses blueprints en async après onEnable.
@@ -178,8 +176,6 @@ public class DanseAvecLaStare extends JavaPlugin {
             File modelFile = new File(blueprintsFolder, modelId + ".bbmodel");
             if (!modelFile.exists()) {
                 getLogger().severe("[DanseAvecLaStare] ATTENTION: Modèle '" + modelId + ".bbmodel' introuvable dans " + blueprintsFolder.getPath());
-            } else {
-                getLogger().info("[DanseAvecLaStare] Modèle '" + modelId + ".bbmodel' trouvé.");
             }
         }
     }

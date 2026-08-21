@@ -2,6 +2,8 @@
 
 Plugin Paper (1.21.x) qui affiche des danseurs 3D animés via ModelEngine 4.
 
+**Modèle 3D d'exemple :** [`player_floss.bbmodel`](https://github.com/Utruna/DanseAvecLaStare/raw/main/models/player_floss.bbmodel) — modèle Blockbench conforme aux règles du [guide d'intégration](docs/BBMODEL_INTEGRATION.md), prêt à copier dans `plugins/ModelEngine/blueprints/`.
+
 ---
 
 ## Prérequis

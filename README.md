@@ -8,9 +8,14 @@ Plugin Paper (1.21.x) qui affiche des danseurs 3D animés via ModelEngine 4.
 
 ## Prérequis
 
+<<<<<<< HEAD
 - Paper 1.21.x
 - Java 21+
 - ModelEngine 4.0.9
+=======
+<!-- Remplace la ligne ci-dessous par une vraie capture/GIF une fois uploadée dans assets/ -->
+<img src="assets/tunnelvision_demo.png" alt="Démo TunnelVision" width="700"/>
+>>>>>>> f0156cd (Mise à jour des démos dans le README avec de nouvelles images et ajout de fichiers GIF pour les démonstrations)
 
 ## Mise en place
 
@@ -108,14 +113,28 @@ Les danseurs statiques sont sauvegardés automatiquement et restaurés au redém
 
 ## Configuration
 
+<<<<<<< HEAD
 Les styles de danse se définissent dans `config.yml` sans recompiler.
 Voir [`docs/static_dancers.md`](docs/static_dancers.md) pour les danseurs statiques et les chorégraphies, [`docs/playlists.md`](docs/playlists.md) pour le système de playlists, [`docs/menus.md`](docs/menus.md) pour la documentation des menus, et [`docs/BBMODEL_INTEGRATION.md`](docs/BBMODEL_INTEGRATION.md) pour l'intégration des modèles.
+=======
+<!-- Remplace par une capture/GIF de la détection en action -->
+<img src="assets/optronique.gif" alt="Démo détection de cible" width="700"/>
+
+Système expérimental de détection et de suivi de cible pour Counter-Strike 2, basé sur YOLOv10. Projet développé strictement à des fins éducatives pour l'étude de la vision par ordinateur en temps réel.
+
+🔗 [Code source](https://github.com/Utruna/optronique)
+>>>>>>> f0156cd (Mise à jour des démos dans le README avec de nouvelles images et ajout de fichiers GIF pour les démonstrations)
 
 ---
 
 ## Performance & limites
 
+<<<<<<< HEAD
 ### Danses concurrentes
+=======
+<!-- Remplace par une capture/GIF du plugin en action -->
+<img src="assets/danse.gif" alt="Démo DanseAvecLaStare" width="700"/>
+>>>>>>> f0156cd (Mise à jour des démos dans le README avec de nouvelles images et ajout de fichiers GIF pour les démonstrations)
 
 | Clé config | Défaut | Effet |
 |---|---|---|
